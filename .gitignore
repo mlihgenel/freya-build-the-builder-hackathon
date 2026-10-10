@@ -23,6 +23,9 @@ __pycache__/
 *.egg-info/
 .DS_Store
 
-# geliştirme sırasında üretilen trace/export'lar (teslim edilecekler final-* adıyla üretilir)
-traces/dev-*
-exports/dev-*
+# trace ve export'lardan sadece teslim edilecekler (final-* slotları) git'e girer; geliştirme ve prova
+# çıktıları (dev-*, prova-*, rep-*, sonnet-* …) yerelde kalır
+traces/*
+!traces/final-*
+exports/*
+!exports/final-*
