@@ -100,11 +100,15 @@ def negotiate_task(spec: PolicySpec) -> str:
         "The customer is verified. You have just told them: \"{{debt_statement}} {{first_ask}}\"",
         "",
         "FACTS FROM THE BANK (already computed for today; use them exactly, never compute dates yourself):",
-        "Today is {{today_spoken}} ({{today_iso}}).",
+        "Today is {{today_spoken}} ({{today_iso}}). Tomorrow is {{tomorrow_spoken}} ({{tomorrow_iso}}).",
         "Products (in the bank's order):",
         "{{product_facts}}",
         "Calendar (use it to turn any day the customer says into a YYYY-MM-DD date):",
         "{{day_table}}",
+        "",
+        "DATES THE CUSTOMER SAYS: look up any day the customer names (today, tomorrow, a weekday, 'this'/'next' "
+        "weekday, a date in words) in the calendar table and use exactly that date. The attempt dates in the facts are "
+        "only for your own proposals; never replace a date the customer named with one of them.",
         "",
         "RULES:",
         bullets(n.rules),

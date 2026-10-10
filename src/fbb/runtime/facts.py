@@ -3,6 +3,7 @@
 `RT`, spec'ten derlenen çalışma zamanı sabitleridir (emit.py snippet'in başına koyar).
 Çıktılar `vars`'a yazılır ve prompt'larda `{{değişken}}` olarak kullanılır.
 """
+import datetime
 import json
 
 
@@ -112,6 +113,9 @@ def prep_account(vars, RT):
     vars["day_table"] = day_table(today, add_business_days(latest, 5, RT["cal"]), RT["cal"])
     vars["today_iso"] = today.isoformat()
     vars["today_spoken"] = spoken_date(today)
+    tomorrow = to_date(today) + datetime.timedelta(days=1)
+    vars["tomorrow_iso"] = tomorrow.isoformat()
+    vars["tomorrow_spoken"] = spoken_date(tomorrow)
     vars["plans_json"] = json.dumps(plans)
     vars["product_ids"] = ",".join(p["product_id"] for p in plans)
     vars["product_count"] = str(len(plans))
