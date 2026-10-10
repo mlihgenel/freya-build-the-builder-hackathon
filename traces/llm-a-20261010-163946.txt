@@ -1,0 +1,8 @@
+[2026-10-10T16:39:46+0300 +   0.0s] start: build başladı: slot=llm-a
+[2026-10-10T16:39:46+0300 +   0.0s] tools: 7 tool, base https://freya-bank-mock.freyavoice.workers.dev/v1
+[2026-10-10T16:40:38+0300 +  52.7s] model_call: claude-opus-5-5 — brief → PolicySpec çıkarımı (deneme 1) (53 s, $0.227)
+[2026-10-10T16:41:52+0300 + 126.3s] model_call: claude-opus-5-5 — spec denetimi (brief ile karşılaştırma) (deneme 1) (74 s, $0.784)
+[2026-10-10T16:41:52+0300 + 126.3s] audit: 0 düzeltme
+[2026-10-10T16:41:52+0300 + 126.3s] spec_ready: spec yazıldı (0 uyumsuzluk)
+[2026-10-10T16:41:52+0300 + 126.4s] workflow: 35 node, hash 7d86a6974be63d6e, lint 0 sorun
+[2026-10-10T16:41:52+0300 + 126.4s] end: deploy kapalı, yerel çıktı hazır

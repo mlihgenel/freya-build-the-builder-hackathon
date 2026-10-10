@@ -1,0 +1,24 @@
+# gizli bilgiler
+env.sh
+.env
+.env.*
+
+# kit ve Freya yerel durumu
+.freya-agents.json
+kit/.personas.json
+kit/results/
+kit/traces/
+.personas.json
+
+# çıktılar (exports/ ve traces/ teslim edilir, gitignore'a girmez)
+out/
+results/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.DS_Store

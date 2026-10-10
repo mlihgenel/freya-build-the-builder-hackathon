@@ -1,0 +1,161 @@
+"""Altın spec → workflow: statik kontroller, determinizm, snippet'lerin yerel çalışması."""
+import json
+
+import pytest
+
+from conftest import KIT, ROOT
+from fbb.ingest.openapi import load_catalog
+from fbb.runtime.emit import run_snippet
+from fbb.spec import PolicySpec
+from fbb.workflow.graph import build_workflow, workflow_hash
+from fbb.workflow.lint import lint
+
+FIX = ROOT / "tests" / "fixtures"
+
+
+@pytest.fixture(scope="module")
+def cat():
+    return load_catalog(KIT / "tools" / "openapi.json")
+
+
+def spec(name):
+    return PolicySpec.model_validate(json.loads((FIX / name).read_text()))
+
+
+@pytest.mark.parametrize("name", ["spec_a.json", "spec_ab.json"])
+def test_workflow_lints_clean(cat, name):
+    s = spec(name)
+    wf = build_workflow(s, cat)
+    assert lint(wf, cat, call_vars=s.call_variables.all, forbidden_pre_verify=s.opening.forbidden_before_verification) == []
+
+
+def test_deterministic(cat):
+    assert workflow_hash(build_workflow(spec("spec_a.json"), cat)) == workflow_hash(build_workflow(spec("spec_a.json"), cat))
+
+
+def test_system_prompt_has_no_purpose_words(cat):
+    s = spec("spec_a.json")
+    wf = build_workflow(s, cat)
+    sp = wf["system_prompt"].lower()
+    for w in ("collections", "debt", "past due", "loan"):
+        assert w not in sp
+
+
+def _code_of(node):
+    return node["pre_actions"][0]["function"]["parameters"]["properties"]["code"]["default"]
+
+
+def _tool_code(node, tool):
+    t = [x for x in node["tools"] if x["function"]["name"] == tool][0]
+    return t["function"]["parameters"]["properties"]["code"]["default"]
+
+
+def test_identity_loop_locally(cat, public_cases):
+    """PUB-01 kimlik akışı: engine'in vereceği cevapları taklit ederek code node'larını sırayla çalıştır."""
+    wf = build_workflow(spec("spec_a.json"), cat)
+    n = wf["nodes"]
+    v = {"now": "2026-10-14T11:00", "customer_id": "c1"}
+    run_snippet(_code_of(n["identity_check"]), vars=v)
+    assert "date of birth" in v["id_say"]
+    v["submit_answer_args.answer"] = "fourteenth of March nineteen eighty-eight"
+    run_snippet(_tool_code(n["ask_identity"], "submit_answer"), vars=v)
+    assert v["id_ready"] == "yes" and v["id_answer"] == "1988-03-14" and v["id_field"] == "date_of_birth"
+    v.update({"id_r_ok": "true", "id_r_verified": "true", "id_r_all": "false", "id_r_left": "3"})
+    run_snippet(_code_of(n["id_result"]), vars=v)
+    assert v["id_state"] == "asking" and "four digits" in v["id_say"]
+    v["submit_answer_args.answer"] = "four four"
+    run_snippet(_tool_code(n["ask_identity"], "submit_answer"), vars=v)
+    assert v["id_ready"] == ""  # yarım cevap gönderilmez
+    v["submit_answer_args.answer"] = "four four seven one"
+    run_snippet(_tool_code(n["ask_identity"], "submit_answer"), vars=v)
+    assert v["id_answer"] == "4471" and v["id_field"] == "phone_last4"
+    v.update({"id_r_ok": "true", "id_r_verified": "true", "id_r_all": "true"})
+    run_snippet(_code_of(n["id_result"]), vars=v)
+    assert v["id_state"] == "verified"
+
+
+def test_three_wrong_answers_fail(cat):
+    wf = build_workflow(spec("spec_a.json"), cat)
+    n = wf["nodes"]
+    v = {"now": "2026-10-14T11:00"}
+    run_snippet(_code_of(n["identity_check"]), vars=v)
+    v.update({"id_r_ok": "true", "id_r_verified": "false", "id_r_all": "false", "id_r_left": "0"})
+    run_snippet(_code_of(n["id_result"]), vars=v)
+    assert v["id_state"] == "failed"
+
+
+def test_record_loop_with_failure(cat, public_cases):
+    """PUB-10: ilk create_promise başarısız, ikincisi başarılı → tek promise, outcome promise."""
+    wf = build_workflow(spec("spec_a.json"), cat)
+    n = wf["nodes"]
+    products = [dict(p, product_id="p%d" % (i + 1)) for i, p in enumerate(public_cases["PUB-10"]["products"])]
+    v = {"now": "2026-10-14T11:00", "products": products}
+    run_snippet(_code_of(n["prep_account"]), vars=v)
+    plan = json.loads(v["plans_json"])[0]
+    v["submit_results_args.results"] = f"p1:{plan['past_due']}:2026-10-16"
+    run_snippet(_tool_code(n["negotiate"], "submit_results"), vars=v)
+    assert v["commit"] == "ready", v.get("commit_msg")
+    run_snippet(_code_of(n["rec_pick"]), vars=v)
+    assert v["rec_state"] == "go"
+    v["rec_r_ok"] = ""  # 500: mapping boş kalır
+    run_snippet(_code_of(n["rec_after"]), vars=v)
+    run_snippet(_code_of(n["rec_pick"]), vars=v)
+    assert v["rec_state"] == "go"
+    v["rec_r_ok"] = "true"
+    run_snippet(_code_of(n["rec_after"]), vars=v)
+    run_snippet(_code_of(n["rec_pick"]), vars=v)
+    assert v["rec_state"] == "done" and v["promises_ok"] == "1"
+    run_snippet(_code_of(n["note_pick"]), vars=v)
+    assert v["note_state"] == "done"
+    run_snippet(_code_of(n["close_final"]), vars=v)
+    assert v["close_outcome"] == "promise" and v["close_reason"] == ""
+    assert "text message" in v["closing_speech"] and "recorded" in v["closing_speech"]
+    # close_call pre-hook: reason gönderilmez
+    pre = wf["tools"][0]["pre_process_code"]
+    config = {"body": {"customer_id": "c1", "outcome": "promise", "reason": ""}}
+    run_snippet(pre, vars=v, config=config)
+    assert config["body"] == {"customer_id": "c1", "outcome": "promise"}
+
+
+def test_multi_product_notes(cat, public_cases):
+    """PUB-12: bir promise, iki 'refused' notu."""
+    wf = build_workflow(spec("spec_ab.json"), cat)
+    n = wf["nodes"]
+    products = [dict(p, product_id="p%d" % (i + 1)) for i, p in enumerate(public_cases["PUB-12"]["products"])]
+    v = {"now": "2026-10-14T11:00", "products": products}
+    run_snippet(_code_of(n["prep_account"]), vars=v)
+    plans = json.loads(v["plans_json"])
+    v["submit_results_args.results"] = f"p1:{plans[0]['past_due']}:2026-10-15; p2:refused; p3:refused"
+    run_snippet(_tool_code(n["negotiate"], "submit_results"), vars=v)
+    assert v["commit"] == "ready", v.get("commit_msg")
+    run_snippet(_code_of(n["rec_pick"]), vars=v)
+    v["rec_r_ok"] = "true"
+    run_snippet(_code_of(n["rec_after"]), vars=v)
+    run_snippet(_code_of(n["rec_pick"]), vars=v)
+    notes = []
+    for _ in range(5):
+        run_snippet(_code_of(n["note_pick"]), vars=v)
+        if v["note_state"] != "go":
+            break
+        notes.append((v["note_pid"], v["note_reason"]))
+        v["note_r_ok"] = "true"
+        run_snippet(_code_of(n["note_after"]), vars=v)
+    assert notes == [("p2", "refused"), ("p3", "refused")]
+    run_snippet(_code_of(n["close_final"]), vars=v)
+    assert v["close_outcome"] == "promise"
+
+
+def test_coerce_hook_makes_amount_number(cat):
+    wf = build_workflow(spec("spec_a.json"), cat)
+    rec = wf["nodes"]["record_promise"]["pre_actions"][0]
+    config = {"body": {"customer_id": "c1", "product_id": "p1", "amount": "637.5", "date": "2026-10-16"}}
+    run_snippet(rec["pre_process_code"], vars={}, config=config)
+    assert config["body"]["amount"] == 637.5
+
+
+def test_closing_speech_fills_call_variables(cat):
+    wf = build_workflow(spec("spec_a.json"), cat)
+    v = {"title": "Ms", "last_name": "Almeida", "close_outcome": ""}
+    run_snippet(_code_of(wf["nodes"]["close_id_failed"]), vars=v)
+    assert v["closing_speech"].endswith("Ms Almeida. Goodbye.") and "{" not in v["closing_speech"]
+    assert v["close_outcome"] == "not_verified" and v["close_reason"] == "failed"

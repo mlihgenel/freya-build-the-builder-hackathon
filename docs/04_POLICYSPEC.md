@@ -1,0 +1,56 @@
+# 04: PolicySpec
+
+Şema: `src/fbb/spec.py` (pydantic, `extra="forbid"`). Altın örnekler: `tests/fixtures/spec_a.json`, `spec_ab.json` (elle, brief'ten). LLM bu şemayı structured output ile doldurur. `cross_check` enum değerlerini openapi ile karşılaştırır.
+
+## Bölümler
+
+| Alan | İçerik | Kullanıldığı yer |
+|---|---|---|
+| `bank_name`, `agent_role`, `language` | kimlik | system prompt |
+| `call_variables` | `customer_id` ve `now` değişken adları, hitap şablonu, bütün değişkenler | baked `{{…}}`, `parse_now`, kapanış cümlesinin doldurulması |
+| `opening` | ilk cümle, onay sorusu, kabul edilen ve edilmeyen onaylar, doğrulama öncesi yasaklı kelimeler, robot/scam/bilinmiyor cevapları, `unclear` outcome'u | `opener` node'u, system prompt, lint |
+| `third_party` | ulaşma sorusu, callback penceresi (günler, saatler, uçlar dahil mi, `now` sonrası mı, tekrar hakkı), 4 outcome, taziye cümlesi, kurallar | `third_party*` node'ları, `check_callback` |
+| `identity` | sorular (alan, cümle, cevap tipi), sayısal tarih sırası, en fazla yanlış sayısı, swap hint, başarısızlık/ret cümleleri ve outcome'ları | `id_*` fonksiyonları, `ask_identity` |
+| `disclosure` | doğrulama sonrası giriş cümlesi, ürün cümlesi şablonu, ürün tipine göre ifade ve floor alanı | `prep_account` |
+| `calendar`, `bands` | iş günleri, tatiller; days_late aralığı → deadline (iş günü), deneme sayısı | `dates.py`, `facts.py`, `validate.py` |
+| `negotiation` | ilk soru (tek/çok ürün), deneme planı (`full`/`floor` × `end_of_week`/`deadline`/…), kurallar, yasak teklifler | `facts.py` (deneme tarihleri), `negotiate` görevi |
+| `confirmation`, `recording` | onay sorusu, kayıt yeniden deneme sayısı, başarı ve başarısızlık cümleleri, başarısızlık durumu | `negotiate` görevi, `rec_after`, `closing_speech` |
+| `transfers[]` | id, kuyruk (openapi enum'u), tetikleyici, cümle, önce sorulacak soru, aşamalar | `transfer_<id>` node'ları ve tool-call transition'ları |
+| `statuses[]` | promise'siz bitiş durumları (= not sebebi = kapanış sebebi) | `submit_results` doğrulaması, notlar, kapanış |
+| `multi_product` | açık mı, kurallar, notlar açık mı, transferde not yok kuralı | `negotiate` görevi, `note_pick` |
+| `closing` | outcome eşlemesi, kuyruk → reason, reason almayan outcome'lar, telefon kapanınca yedek outcome, veda | `decide_close`, `apply_close_body` |
+| `money` | para birimi ön ek/son ek | `fmt_money` |
+| `tool_fields` | openapi alan adları rol adlarından farklıysa eşleme | `graph.field_map` |
+| `general_rules`, `unmapped` | her yerde geçerli kurallar, yerleştirilemeyenler | `negotiate` görevi |
+
+## Brief A → spec eşlemesi (kural numaraları)
+
+| Brief A kuralı | Spec yolu |
+|---|---|
+| 1–2 açılış, onay sorusu | `opening.first_sentence`, `opening.confirm_question`, `forbidden_before_verification` |
+| 3 onay kuralları, ikinci kez sorma, `unclear` | `opening.accepted_confirmations/not_confirmations/max_asks/unclear` |
+| 4 robot, 43 scam, 44 bilinmeyen | `opening.robot_answer/scam_answer/unknown_answer` |
+| 5–10 üçüncü kişi | `third_party.*` |
+| 11–15 kimlik | `identity.*` (DMY, `max_wrong_total` 3, `swap_hint` `day_month_swapped`, ret açıklaması, 2 ret → declined) |
+| 16–17 borcun söylenmesi | `disclosure.*` |
+| 18 bantlar, iş günleri, tatiller | `bands`, `calendar` |
+| 19–23 tarih kuralları | `negotiation.rules` + kod (`check_promise`, `day_table`) |
+| 24–27 tutar ve floor | `disclosure.floor_field`, `negotiation.rules`, `check_promise` |
+| 28–31 ikna denemeleri | `negotiation.first_ask_single`, `negotiation.attempts` |
+| 32 hardship | `transfers[support]`, `statuses[hardship]`, kural |
+| 33 yasak teklifler | `negotiation.forbidden_offers` |
+| 34–36 onay ve read-back | `confirmation.*` |
+| 37–38 kayıt, hata, SMS cümlesi | `recording.*` + engine kayıt döngüsü |
+| 39 paid, 40 dispute | `statuses[paid]`, `statuses[dispute]` |
+| 41 restructuring, 42 insan | `transfers[restructuring]`, `transfers[human]` (`ask_first`) |
+| 45 konuşmak istemiyor | `statuses[refused]` / doğrulama öncesi `close_id_declined` |
+| 46–47 kapanış tablosu, veda | `closing.*` |
+
+Brief B'nin 11 kuralı `multi_product.rules`'a girer ve şunları açar: `notes_enabled`, `first_ask_multi`, ürün başına bant ve deneme (kod zaten ürün başına hesaplar). Kapanış: hepsi `paid` ise `paid`; değilse `get_account` sırasına göre ilk `paid` olmayan durum (`decide_close`).
+
+## LLM çıkarımı ile altın spec (10 Ekim, Brief A)
+Takvim, bantlar, denemeler, floor ve ifade şablonları, callback penceresi, kapanış eşlemesi ve onay soruları **birebir aynı** çıktı.
+
+Farklar ve yapılan düzeltmeler:
+- `success_sentence`'e "Your promise is recorded." eklemişti. Bu tekrar yaratıyordu; prompt'a ve alan açıklamasına "sistem zaten söyler" notu eklendi.
+- Veda cümlesi `{title} {last_name}` içeriyordu. `closing_speech` artık çağrı değişkenleriyle dolduruluyor.
