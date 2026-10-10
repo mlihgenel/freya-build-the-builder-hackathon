@@ -76,20 +76,21 @@ def code(name: str, snippet: str, transitions: list, default_target: str, timeou
 
 
 def api_request(name: str, call: dict, mapping: list[tuple[str, str]], default_target: str,
-                transitions: list | None = None) -> dict:
+                transitions: list | None = None, on_enter: dict | None = None) -> dict:
     return {
         "name": name,
         "node_type": "api_request",
         "passthrough": True,
         "passthrough_default_transition": default_target,
-        "on_enter": {"type": "silent"},
+        "on_enter": on_enter or {"type": "silent"},
         "pre_actions": [call],
         "response_mapping": [{"path": p, "variable": v} for p, v in mapping],
         "transitions": (transitions or []) + [always(default_target)],
     }
 
 
-def end_call(name: str, function_name: str, speech: str) -> dict:
+def end_call(name: str, function_name: str, speech: str = "") -> dict:
+    """speech boşsa sessiz kapanır (veda bir önceki node'da söylenmiştir)."""
     return {
         "name": name,
         "node_type": "end_call",
@@ -100,8 +101,8 @@ def end_call(name: str, function_name: str, speech: str) -> dict:
             "name": function_name,
             "handler": "__function__:end_call",
             "parameters": {"type": "object", "properties": {
-                "message_mode": {"type": "string", "default": "custom"},
-                "spoken_message": {"type": "string", "default": speech},
+                "message_mode": {"type": "string", "default": "custom" if speech else "none"},
+                **({"spoken_message": {"type": "string", "default": speech}} if speech else {}),
             }},
         }},
     }

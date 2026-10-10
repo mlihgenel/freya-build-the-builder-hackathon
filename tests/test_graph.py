@@ -104,13 +104,13 @@ def test_record_loop_with_failure(cat, public_cases):
     assert v["next_step"] == "record"  # bir kez daha denenir
     v["rec_r_ok"] = "true"
     run_snippet(_code_of(n["rec_step"]), vars=v)
-    assert v["next_step"] == "end" and v["promises_ok"] == "1"
-    assert v["close_outcome"] == "promise" and v["close_reason"] == ""
+    assert v["next_step"] == "end_nr" and v["promises_ok"] == "1"
+    assert v["close_outcome"] == "promise" and v["close_kind"] == "noreason"
     assert "text message" in v["closing_speech"] and "recorded" in v["closing_speech"]
-    pre = wf["tools"][0]["pre_process_code"]
-    config = {"body": {"customer_id": "c1", "outcome": "promise", "reason": ""}}
-    run_snippet(pre, vars=v, config=config)
-    assert config["body"] == {"customer_id": "c1", "outcome": "promise"}
+    # promise: close_call gövdesinde reason alanı hiç yok (score.py None bekliyor)
+    body = n["send_close_nr"]["pre_actions"][0]["function"]["parameters"]["properties"]["body"]["properties"]
+    assert set(body) == {"customer_id", "outcome"}
+    assert n["send_close_nr"]["on_enter"] == {"type": "tts", "text": "{{closing_speech}}"}
 
 
 def test_record_fails_twice_service_error(cat, public_cases):
@@ -124,7 +124,7 @@ def test_record_fails_twice_service_error(cat, public_cases):
     for _ in range(2):
         v["rec_r_ok"] = ""
         run_snippet(_code_of(n["rec_step"]), vars=v)
-    assert v["next_step"] == "end"
+    assert v["next_step"] == "end_r"
     assert (v["close_outcome"], v["close_reason"]) == ("no_promise", "service_error")
     assert "could not record" in v["closing_speech"]
 
@@ -147,7 +147,7 @@ def test_multi_product_notes(cat, public_cases):
         v["note_r_ok"] = "true"
         run_snippet(_code_of(n["note_step"]), vars=v)
     assert notes == [("p2", "refused"), ("p3", "refused")]
-    assert v["next_step"] == "end" and v["close_outcome"] == "promise"
+    assert v["next_step"] == "end_nr" and v["close_outcome"] == "promise"
 
 
 def test_transfer_prepares_close(cat):
@@ -155,7 +155,8 @@ def test_transfer_prepares_close(cat):
     v = {"title": "Mr", "last_name": "X"}
     run_snippet(_code_of(wf["nodes"]["transfer_restructuring"]), vars=v)
     assert (v["close_outcome"], v["close_reason"]) == ("transferred", "restructuring")
-    assert wf["nodes"]["do_transfer"]["transitions"][-1]["target_node"] == "end_main"
+    assert wf["nodes"]["do_transfer"]["transitions"][-1]["target_node"] == "send_close"
+    assert wf["tools"] == []  # close_call artık lifecycle değil, hook'suz bir adım
 
 
 def test_closing_speech_fills_call_variables(cat):
@@ -175,3 +176,50 @@ def test_every_code_node_has_failure_guard(cat):
             assert first["target_node"] == "end_fallback", name
             assert first["condition"]["conditions"][0]["variable"] == f"{name}_failure_count", name
     assert "{{" not in wf["nodes"]["end_fallback"]["terminal"]["function"]["parameters"]["properties"]["spoken_message"]["default"].replace("{{title}}", "").replace("{{last_name}}", "")
+
+
+def test_third_party_goodbye_has_no_customer_name(cat):
+    """PUB-02: telefonu açan eşe müşterinin adıyla veda edilmemeli."""
+    wf = build_workflow(spec("spec_a.json"), cat)
+    v = {"now": "2026-10-14T11:00", "title": "Ms", "last_name": "Costa"}
+    run_snippet(_code_of(wf["nodes"]["close_callback"]), vars=v)
+    assert "Costa" not in v["closing_speech"] and v["closing_speech"].endswith("Goodbye.")
+    assert (v["close_outcome"], v["close_reason"]) == ("not_reached", "callback")
+
+
+def test_transfer_close_does_not_repeat_the_transfer_sentence(cat):
+    """PUB-09: model transfer cümlesini zaten söylüyor; kapanış tekrar etmemeli."""
+    s = spec("spec_a.json")
+    wf = build_workflow(s, cat)
+    v = {"title": "Mr", "last_name": "Ionescu"}
+    run_snippet(_code_of(wf["nodes"]["transfer_restructuring"]), vars=v)
+    say = [t.say for t in s.transfers if t.id == "restructuring"][0]
+    assert say not in v["closing_speech"]
+
+
+def test_multi_product_prompt_demands_one_joint_confirmation(cat):
+    """PUB-11'de agent her ürün için ayrı onay aldı; brief tek ortak onay istiyor."""
+    task = build_workflow(spec("spec_ab.json"), cat)["nodes"]["negotiate"]["task_message"]
+    assert "ONE message" in task and "ONCE" in task
+    assert "ONE message" not in build_workflow(spec("spec_a.json"), cat)["nodes"]["negotiate"]["task_message"]
+
+
+def test_close_nodes_route_by_reason(cat):
+    wf = build_workflow(spec("spec_a.json"), cat)
+    n = wf["nodes"]
+    v = {"title": "Mr", "last_name": "Park"}
+    run_snippet(_code_of(n["close_id_failed"]), vars=v)
+    assert v["close_kind"] == "reason"
+    targets = [t["target_node"] for t in n["close_id_failed"]["transitions"]]
+    assert targets == ["end_fallback", "send_close_nr", "send_close"]
+    assert n["end_main"]["terminal"]["function"]["parameters"]["properties"]["message_mode"]["default"] == "none"
+
+
+def test_day_table_gives_per_product_verdicts(ns, rt_a, public_cases):
+    products = [dict(p, product_id="p%d" % (i + 1)) for i, p in enumerate(public_cases["PUB-07"]["products"])]
+    v = {"now": "2026-10-14T11:00", "products": products}
+    ns["prep_account"](v, rt_a)
+    row = [x for x in v["day_table"].splitlines() if x.startswith("2026-10-26")][0]
+    assert "HOLIDAY" in row and "offer the next business day 2026-10-27 Tuesday" in row
+    late = [x for x in v["day_table"].splitlines() if x.startswith("2026-11-03")][0]
+    assert "after its deadline" in late

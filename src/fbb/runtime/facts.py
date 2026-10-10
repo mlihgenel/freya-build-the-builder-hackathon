@@ -110,7 +110,7 @@ def prep_account(vars, RT):
                          + a["date"] + " (" + spoken_date(a["date"]) + ")")
     vars["product_facts"] = "\n".join(lines) if lines else "- no late products were returned"
     latest = max([to_date(p["deadline"]) for p in plans] or [today])
-    vars["day_table"] = day_table(today, add_business_days(latest, 5, RT["cal"]), RT["cal"])
+    vars["day_table"] = day_table(today, add_business_days(latest, 5, RT["cal"]), RT["cal"], plans)
     vars["today_iso"] = today.isoformat()
     vars["today_spoken"] = spoken_date(today)
     tomorrow = to_date(today) + datetime.timedelta(days=1)

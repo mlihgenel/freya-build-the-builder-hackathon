@@ -218,6 +218,7 @@ staging-app.freyavoice.ai → çağrı kayıtları. Simülasyon çağrıları "S
 | 17:13 | dev-a (v1) | Brief A, 10 vaka × 1 | **10/10** | kayıt zinciri uzun (en yavaş tur ~27–38 sn) |
 | 17:19 | dev-b (v1) | Brief B, 3 vaka × 1 | 0/3 | kod servisi kesintisi → kayıt döngüsü kilitlendi. Konuşmalar doğruydu; bir "yarın" tarih hatası bulundu |
 | 17:28 | dev-b (v2) | Brief B, 3 vaka × 1 | 0/3 | kod servisi tamamen kapalı; koruma çağrıyı temiz kapattı |
+| 17:45 | dev-b (v3) | Brief B, 3 vaka × 1 | **3/3** | kod servisi düzelmişti. Risk: PUB-11'de her ürün ayrı onaylandı (brief tek ortak onay istiyor); prompt'ta düzeltildi (v4) |
 
 Bu sonuçlardan sonra yapılan düzeltmeler:
 - kayıt zinciri 6 adımdan 2'ye indi
@@ -225,4 +226,4 @@ Bu sonuçlardan sonra yapılan düzeltmeler:
 - kod zaman sınırı 30 sn'ye çıktı
 - "yarın" tarih kuralı eklendi
 
-Sıradaki ölçüm: kod servisi düzelince A ve B'yi `--reps 3` ile çalıştırmak.
+Sıradaki ölçüm: A (v4) ve B (v4) `--reps 3`, ardından konuşma stilleri.

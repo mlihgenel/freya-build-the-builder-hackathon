@@ -19,6 +19,8 @@ from fbb.workflow.tools import bank_call, model_tool
 
 END = "end_main"
 FALLBACK_END = "end_fallback"
+SEND = "send_close"          # veda + close_call (reason ile)
+SEND_NR = "send_close_nr"    # veda + close_call (reason alanı yok: promise, paid)
 
 
 def code(*args, **kw) -> dict:
@@ -55,11 +57,14 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
     def snip(entry: str, fallback: str = "") -> str:
         return build_snippet(entry, rt, fallback=fallback)
 
-    def close_node(name: str, outcome: str, reason: str, speech: str) -> dict:
+    def close_node(name: str, outcome: str, reason: str, speech: str, anonymous: bool = False) -> dict:
         entry = f"set_close(vars, RT, {outcome!r}, {reason!r}, {speech!r})"
+        if anonymous:
+            entry = "vars['anonymous_goodbye'] = 'yes'\n" + entry
         fb = f"vars['close_outcome'] = {outcome!r}\nvars['close_reason'] = {reason!r}\n" \
              f"vars['closing_speech'] = {(speech + ' ' + spec.closing.goodbye_sentence).strip()!r}"
-        return code(name, snip(entry, fb), [], END)
+        return code(name, snip(entry, fb), [when_eq(SEND_NR, "close without reason", "close_kind", "noreason")],
+                    SEND)
 
     nodes: dict[str, dict] = {}
 
@@ -123,7 +128,8 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
     post = [t for t in spec.transfers if "post_verify" in t.stages]
     loop = [when_eq("record_promise", "a promise to record", "next_step", "record"),
             when_eq("record_note", "a note to record", "next_step", "note"),
-            when_eq(END, "nothing left to record", "next_step", "end")]
+            when_eq(SEND, "nothing left to record", "next_step", "end_r"),
+            when_eq(SEND_NR, "nothing left to record", "next_step", "end_nr")]
     neg_transitions = [dict(t, description="results accepted: " + t["description"]) for t in loop]
     neg_transitions.append(when_eq("commit_fix", "results rejected", "commit", "invalid"))
     neg_transitions += [tool_transition(f"transfer_{t.id}", t.trigger) for t in post]
@@ -144,24 +150,24 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
                     {"customer_id": cid, "product_id": "{{rec_pid}}", "amount": "{{rec_amount:json}}",
                      "date": "{{rec_date}}"})
     nodes["record_promise"] = api_request("record_promise", rec_call, [("data.ok", "rec_r_ok")], "rec_step")
-    nodes["rec_step"] = code("rec_step", snip("after_record_step(vars, RT)", "vars['next_step'] = 'end'"), loop,
-                             END)
+    nodes["rec_step"] = code("rec_step", snip("after_record_step(vars, RT)", "vars['next_step'] = 'end_r'"), loop,
+                             SEND)
     if cat.has("add_note"):
         note_call = call("add_note", {"customer_id": cid, "product_id": "{{note_pid}}", "reason": "{{note_reason}}"})
         nodes["record_note"] = api_request("record_note", note_call, [("data.ok", "note_r_ok")], "note_step")
     else:
         nodes["record_note"] = code("record_note", snip("vars['note_r_ok'] = 'true'"), [], "note_step")
-    nodes["note_step"] = code("note_step", snip("after_note_step(vars, RT)", "vars['next_step'] = 'end'"), loop,
-                              END)
+    nodes["note_step"] = code("note_step", snip("after_note_step(vars, RT)", "vars['next_step'] = 'end_r'"), loop,
+                              SEND)
     nodes["close_final"] = close_node("close_final", "", "", "")
 
     # --- transferler (kapanış transferden önce hazırlanır) ---------------------------------------------
     for t in spec.transfers:
         nodes[f"transfer_{t.id}"] = code(
-            f"transfer_{t.id}", snip(f"transfer_and_close(vars, RT, {t.queue!r}, {t.say!r})"), [], "do_transfer")
+            f"transfer_{t.id}", snip(f"transfer_and_close(vars, RT, {t.queue!r}, '')"), [], "do_transfer")
     nodes["do_transfer"] = api_request(
         "do_transfer", call("transfer_to_agent", {"customer_id": cid, "queue": "{{transfer_queue}}"}),
-        [("data.ok", "transfer_r_ok")], END)
+        [("data.ok", "transfer_r_ok")], SEND)
 
     # --- üçüncü kişi -----------------------------------------------------------------------------------
     tp = spec.third_party
@@ -197,28 +203,29 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
 
     # --- kapanışlar -----------------------------------------------------------------------------------
     i = spec.identity
-    for name, ref, speech in [
-        ("close_unclear", o.unclear, ""),
-        ("close_wrong_number", tp.wrong_number_outcome, ""),
-        ("close_deceased", tp.deceased_outcome, tp.deceased_sentence),
-        ("close_callback", tp.callback_outcome, ""),
-        ("close_no_callback", tp.no_callback_outcome, ""),
-        ("close_id_failed", i.fail_outcome, i.fail_sentence),
-        ("close_id_declined", i.decline_outcome, ""),
+    # müşteri olduğu doğrulanmamış kişiye müşterinin adıyla veda edilmez
+    for name, ref, speech, anonymous in [
+        ("close_unclear", o.unclear, "", True),
+        ("close_wrong_number", tp.wrong_number_outcome, "", True),
+        ("close_deceased", tp.deceased_outcome, tp.deceased_sentence, True),
+        ("close_callback", tp.callback_outcome, "", True),
+        ("close_no_callback", tp.no_callback_outcome, "", True),
+        ("close_id_failed", i.fail_outcome, i.fail_sentence, False),
+        ("close_id_declined", i.decline_outcome, "", False),
     ]:
-        nodes[name] = close_node(name, ref.outcome, ref.reason, speech)
-    nodes[END] = end_call(END, "call_closed", "{{closing_speech}}")
-    # kod servisi çalışmazsa: değişken gerektirmeyen sabit veda (close_call yine lifecycle olarak çalışır)
+        nodes[name] = close_node(name, ref.outcome, ref.reason, speech, anonymous)
+    # --- kapanış: veda cümlesi söylenir, sonra close_call (her zaman son banka çağrısı), sonra telefon kapanır.
+    # close_call'da hook yok: kod servisi kapanış anında kesilse bile çağrı gider (10 Ekim'de lifecycle
+    # pre-hook'u snekbox hatasıyla düştü ve close_call hiç gönderilmedi).
+    say = {"type": "tts", "text": "{{closing_speech}}"}
+    nodes[SEND] = api_request(SEND, call("close_call", {"customer_id": cid, "outcome": "{{close_outcome}}",
+                                                        "reason": "{{close_reason}}"}),
+                              [("data.ok", "close_r_ok")], END, on_enter=say)
+    nodes[SEND_NR] = api_request(SEND_NR, call("close_call", {"customer_id": cid, "outcome": "{{close_outcome}}"}),
+                                 [("data.ok", "close_r_ok")], END, on_enter=say)
+    nodes[END] = end_call(END, "call_closed")
+    # kod servisi çalışmazsa: değişken gerektirmeyen sabit veda
     nodes[FALLBACK_END] = end_call(FALLBACK_END, "call_closed_fallback", texts.tpl(spec.closing.goodbye_sentence))
-
-    # --- close_call: çağrı bittiğinde engine çalıştırır, her zaman son çağrıdır -------------------------
-    close_pre = build_snippet(
-        "b = config.get('body')\nif isinstance(b, dict):\n    apply_close_body(vars, b, RT)",
-        rt, fallback="b = config.get('body')\nif isinstance(b, dict) and not str(b.get('reason', '')).strip("
-                     "'{} '):\n    b.pop('reason', None)")
-    close_tool = call("close_call", {"customer_id": cid, "outcome": "{{close_outcome}}",
-                                               "reason": "{{close_reason}}"},
-                           pre_hook=close_pre, lifecycle="end_of_call")
 
     test_vars = {v: "" for v in spec.call_variables.all}
     return {
@@ -226,7 +233,7 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
         "system_prompt": texts.system_prompt(spec),
         "nodes": nodes,
         "global_nodes": {},
-        "tools": [close_tool],
+        "tools": [],
         "test_variables": test_vars,
     }
 

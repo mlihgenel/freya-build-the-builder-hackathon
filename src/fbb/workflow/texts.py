@@ -79,6 +79,8 @@ def identity_task(spec: PolicySpec) -> str:
         "This step is the security check. You have just asked the customer: \"{{id_say}}\"",
         "- When the customer answers that question, call submit_answer with their answer exactly as they said it "
         "(words are fine, do not convert). Do not speak before the call. Never guess or fill in an answer yourself.",
+        "- If a message contains an answer AND a question or complaint, it is an answer: call submit_answer first. "
+        "Only a message with no answer at all can count as refusing.",
         "- If they give only part of a number or a date, ask for the rest, then call submit_answer with the whole answer.",
         "- If they ask a question back, answer it briefly in one sentence and ask the security question again.",
         f'- If they refuse to answer or ask what the call is about instead: the first time say "{i.decline_explain}" '
@@ -103,16 +105,22 @@ def negotiate_task(spec: PolicySpec) -> str:
         "Today is {{today_spoken}} ({{today_iso}}). Tomorrow is {{tomorrow_spoken}} ({{tomorrow_iso}}).",
         "Products (in the bank's order):",
         "{{product_facts}}",
-        "Calendar (use it to turn any day the customer says into a YYYY-MM-DD date):",
+        "Calendar. Each row ends with what to do, per product, if the customer names that day. Follow it exactly:",
         "{{day_table}}",
         "",
         "DATES THE CUSTOMER SAYS: look up any day the customer names (today, tomorrow, a weekday, 'this'/'next' "
         "weekday, a date in words) in the calendar table and use exactly that date. The attempt dates in the facts are "
-        "only for your own proposals; never replace a date the customer named with one of them.",
+        "only for your own proposals; never replace a date the customer named with one of them. Whenever you say a "
+        "date, take its weekday from the same table row (never work out a weekday yourself). When the customer names "
+        "a day, do what that row says for the product: 'OK' means accept the day; otherwise offer exactly the date "
+        "the row gives.",
         "",
         "RULES:",
         bullets(n.rules),
         bullets(mp.rules) if mp.enabled else "",
+        (f'- With several products: settle every product first WITHOUT asking for confirmation. Then read all '
+         f'promises back together in ONE message and ask "{c.confirm_question}" ONCE. Never ask for a confirmation '
+         f'per product.') if mp.enabled else "",
         bullets(c.rules),
         bullets(spec.general_rules),
         bullets(spec.unmapped),

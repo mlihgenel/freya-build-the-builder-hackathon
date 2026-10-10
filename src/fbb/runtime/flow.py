@@ -6,6 +6,7 @@ commit: ready | invalid | ''              rec_state / note_state: go | done
 cb_state: ok | invalid | gave_up | ''
 """
 import json
+import re
 
 
 def truthy(x):
@@ -210,7 +211,10 @@ def closing_speech(vars, RT, extra):
         names = [plans.get(f["product_id"], dict()).get("wording", "") for f in failed]
         parts.append(RT["recording"]["failure_sentence"] + (" (" + ", ".join(n for n in names if n) + ")"
                                                             if any(names) and len(plans) > 1 else ""))
-    parts.append(RT.get("goodbye", ""))
+    goodbye = RT.get("goodbye", "")
+    if vars.get("anonymous_goodbye") == "yes":
+        goodbye = without_placeholders(goodbye)
+    parts.append(goodbye)
     values = dict((k, vars.get(k, "")) for k in RT.get("call_vars", []))
     return fill(" ".join(x.strip() for x in parts if x and x.strip()), values)
 
@@ -222,6 +226,8 @@ def set_close(vars, RT, outcome, reason, speech):
     o, r = decide_close(vars, RT)
     vars["close_outcome"] = o
     vars["close_reason"] = r
+    has_reason = bool(r) and o not in RT["closing"].get("no_reason_outcomes", [])
+    vars["close_kind"] = "reason" if has_reason else "noreason"
     vars["closing_speech"] = closing_speech(vars, RT, speech)
 
 
@@ -249,7 +255,7 @@ def coerce_body(config, types):
 def next_step(vars, RT):
     """Kayıt/not döngüsünün tek adımı: sıradaki işi seç; iş kalmadıysa kapanışı hazırla.
 
-    Dönüşte vars['next_step']: 'record' | 'note' | 'end'. Her code node'u yük altında birkaç saniye sürdüğü için
+    Dönüşte vars['next_step']: 'record' | 'note' | 'end_r' | 'end_nr' (kapanışta reason var/yok). Her code node'u yük altında birkaç saniye sürdüğü için
     seçim, sonuç işleme ve kapanış tek node'da yapılır."""
     rec_pick(vars, RT)
     if vars.get("rec_state") == "go":
@@ -260,7 +266,7 @@ def next_step(vars, RT):
         vars["next_step"] = "note"
         return
     set_close(vars, RT, "", "", "")
-    vars["next_step"] = "end"
+    vars["next_step"] = "end_r" if vars.get("close_kind") == "reason" else "end_nr"
 
 
 def take_results_and_start(vars, RT, raw):
@@ -285,3 +291,9 @@ def transfer_and_close(vars, RT, queue, say):
     vars["transfer_queue"] = queue
     vars["rec_queue"] = "[]"
     set_close(vars, RT, "", "", say)
+
+
+def without_placeholders(text):
+    """'Thank you for your time, {title} {last_name}. Goodbye.' → 'Thank you for your time. Goodbye.'"""
+    out = re.sub(r",?\s*(\{[a-zA-Z_]+\}\s*)+", "", str(text or ""))
+    return re.sub(r"\s+([.!?,])", r"\1", out).strip()

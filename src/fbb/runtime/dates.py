@@ -132,8 +132,23 @@ def spoken_date(day):
     return weekday_name(day) + " " + str(day.day) + " " + month_name(day.month)
 
 
-def day_table(today, until, cal):
-    """Modelin göreceği takvim: her satırda gün adı, ISO tarih, iş günü mü, this/next etiketi.
+def promise_verdict(day, plan, cal):
+    """Müşteri bu günü söylerse bu ürün için ne yapılır: 'OK' ya da önerilecek tarih."""
+    deadline = to_date(plan["deadline"])
+    if day > deadline:
+        return "after its deadline: offer the deadline " + deadline.isoformat() + " " + weekday_name(deadline)
+    if not is_business_day(day, cal):
+        nxt = next_business_day(day, cal)
+        if nxt > deadline:
+            return "not a business day and the next one is after its deadline: offer the deadline " + \
+                deadline.isoformat() + " " + weekday_name(deadline)
+        return "not a business day: offer the next business day " + nxt.isoformat() + " " + weekday_name(nxt)
+    return "OK, can be recorded"
+
+
+def day_table(today, until, cal, plans=None):
+    """Modelin göreceği takvim. Her satır: ISO tarih, gün adı, this/next etiketi, iş günü mü ve (ürünler verilirse)
+    müşteri o günü söylerse her ürün için hazır karar. Model tarih hesabı yapmaz, satırı okur.
 
     Platformun tarih extraction'ı gerçek saati kullanır; bu tablo `now` çağrı değişkeninden üretilir.
     """
@@ -152,10 +167,15 @@ def day_table(today, until, cal):
             tags.append("this " + weekday_name(day))
         elif wk == 1:
             tags.append("next " + weekday_name(day))
-        status = "business day" if is_business_day(day, cal) else (
-            "HOLIDAY, not a business day" if day.isoformat() in cal.get("holidays", []) else "weekend, not a business day")
-        nbd = "" if is_business_day(day, cal) else "; next business day " + next_business_day(day, cal).isoformat()
-        lines.append(day.isoformat() + " " + weekday_name(day) + " (" + ", ".join(tags) + "): " + status + nbd
-                     if tags else day.isoformat() + " " + weekday_name(day) + ": " + status + nbd)
+        if is_business_day(day, cal):
+            status = "business day"
+        elif day.isoformat() in cal.get("holidays", []):
+            status = "HOLIDAY"
+        else:
+            status = "weekend"
+        line = day.isoformat() + " " + weekday_name(day) + (" (" + ", ".join(tags) + ")" if tags else "") + ": " + status
+        for plan in plans or []:
+            line += " | " + plan["product_id"] + ": " + promise_verdict(day, plan, cal)
+        lines.append(line)
         day = day + datetime.timedelta(days=1)
     return "\n".join(lines)

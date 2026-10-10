@@ -1,0 +1,3 @@
+[2026-10-10T18:02:30+0300 +   0.0s] start: build başladı: slot=spec_a
+[2026-10-10T18:02:30+0300 +   0.0s] tools: 7 tool, base https://freya-bank-mock.freyavoice.workers.dev/v1
+[2026-10-10T18:02:30+0300 +   0.0s] error: build başarısız: [Errno 2] No such file or directory: 'kit/briefs/brief-a.md --spec tests/fixtures/spec_a.json --slot dev-a'
