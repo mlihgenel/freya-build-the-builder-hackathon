@@ -84,7 +84,9 @@ def run_cases(agent_id: str, *, brief: str = "", only: str = "", reps: int = 1, 
               out: Path | None = None, timeout_s: int = 1500) -> dict:
     """Kitin run_cases.py'sini çalıştırır; --out JSON'unu döner."""
     config.load_env()
-    out = out or (config.RESULTS / f"run-{agent_id[:8]}.json")
+    import time
+
+    out = (out or (config.RESULTS / f"run-{agent_id[:8]}-{time.strftime('%m%d-%H%M%S')}.json")).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     cmd = [sys.executable, str(config.KIT / "tools" / "run_cases.py"), agent_id, "--out", str(out)]
     if brief:
@@ -97,6 +99,15 @@ def run_cases(agent_id: str, *, brief: str = "", only: str = "", reps: int = 1, 
         cmd += ["--style", style]
     proc = subprocess.run(cmd, cwd=config.KIT, capture_output=True, text=True, timeout=timeout_s, env=os.environ.copy())
     result = json.loads(out.read_text()) if out.exists() else {}
-    result["stdout"] = proc.stdout[-6000:]
+    result["stdout"] = proc.stdout[-6000:] + f"\nsonuç dosyası: {out}\n" + (proc.stderr[-2000:] if proc.returncode else "")
     result["returncode"] = proc.returncode
     return result
+
+
+def agent_for(slot_or_id: str) -> str:
+    """Slot adı verilirse (.freya-agents.json) agent ID'sine çevirir; ID verilirse aynen döner."""
+    if STATE_FILE.exists():
+        state = json.loads(STATE_FILE.read_text())
+        if slot_or_id in state:
+            return state[slot_or_id]["agent_id"]
+    return slot_or_id

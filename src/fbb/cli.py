@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="fbb")
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("cases", help="kitin run_cases.py'si")
-    c.add_argument("agent_id")
+    c.add_argument("agent_id", help="agent ID ya da slot adı (ör. dev-a)")
     c.add_argument("--brief", default="")
     c.add_argument("--only", default="")
     c.add_argument("--reps", type=int, default=1)
@@ -58,11 +58,30 @@ def main(argv: list[str] | None = None) -> None:
     h.add_argument("message")
     h.add_argument("--case", default="PUB-01", help="çağrı değişkenleri için pratik vaka")
     h.add_argument("--call-id", default="")
+    k = sub.add_parser("call", help="bir çağrının zaman çizelgesi: konuşma, node'lar, tool çağrıları, hatalar")
+    k.add_argument("call_id")
+    k.add_argument("--all", action="store_true", help="route ve değişken olaylarını da göster")
+    r = sub.add_parser("report", help="bir run_cases sonucunun özeti ve başarısız çağrıların ID'leri")
+    r.add_argument("path", help="results/*.json")
     a = ap.parse_args(argv)
     from fbb import kitapi
 
+    if a.cmd == "call":
+        print_call(kitapi.get_call(a.call_id), show_all=a.all)
+        return
+    if a.cmd == "report":
+        res = json.loads(open(a.path).read())
+        print(f"{res.get('passed')}/{res.get('total')} geçti, {res.get('runs')} tekrar, simülasyon {res.get('simulation_id')}")
+        for f in res.get("final", []):
+            print(("PASS" if f["pass"] else "FAIL"), f["id"], f"{f['passes']}/{f['runs']}")
+        for row in res.get("rows", []):
+            if not row["pass"]:
+                print(f"\n{row['id']}  call_id={row.get('call_id')}  tools: {' > '.join(row.get('tools', []))}")
+                for reason in row.get("failed", []):
+                    print("   -", reason[:300])
+        return
     if a.cmd == "cases":
-        res = kitapi.run_cases(a.agent_id, brief=a.brief, only=a.only, reps=a.reps, style=a.style)
+        res = kitapi.run_cases(kitapi.agent_for(a.agent_id), brief=a.brief, only=a.only, reps=a.reps, style=a.style)
         print(res.get("stdout", ""))
     elif a.cmd == "chat":
         state = json.loads(kitapi.STATE_FILE.read_text())
@@ -71,6 +90,37 @@ def main(argv: list[str] | None = None) -> None:
             variables = kitapi.practice_session(a.case).get("variables")
         print(json.dumps(kitapi.chat(state[a.slot]["workflow_id"], a.message, call_id=a.call_id or None,
                                      variables=variables), indent=1, ensure_ascii=False))
+
+
+def print_call(call: dict, show_all: bool = False) -> None:
+    print("bitiş sebebi:", call.get("endedReason"))
+    for m in call.get("messages", []):
+        t = m.get("secondsFromStart") or 0
+        role = m.get("role")
+        if role != "system":
+            print(f"{t:7.1f}  {role.upper()}: {m.get('message', '')}")
+            continue
+        try:
+            e = json.loads(m.get("message") or "{}")
+        except ValueError:
+            continue
+        ev = e.get("event", "")
+        if ev == "node_enter":
+            print(f"{t:7.1f}    > {e.get('node')}")
+        elif ev == "function_call_start":
+            args = e.get("args") or {}
+            shown = args.get("params") or args.get("body") or {k: v for k, v in args.items() if k != "code"}
+            print(f"{t:7.1f}    * {e.get('function')} {json.dumps(shown, ensure_ascii=False)[:200]}")
+        elif ev == "function_call_complete":
+            res = e.get("result") or {}
+            if res.get("status") != "success" or show_all:
+                print(f"{t:7.1f}    ! {e.get('function')} sonuç: {json.dumps(res, ensure_ascii=False)[:200]}")
+            elif isinstance(res.get("data"), dict):
+                print(f"{t:7.1f}      = {json.dumps(res['data'], ensure_ascii=False)[:200]}")
+        elif ev in ("error", "function_call_error"):
+            print(f"{t:7.1f}    !! HATA: {(e.get('error') or e.get('message') or '')[:200]}")
+        elif show_all and ev == "route_evaluated" and e.get("matched"):
+            print(f"{t:7.1f}    → {e.get('target')} ({e.get('reason', '')[:80]})")
 
 
 if __name__ == "__main__":
