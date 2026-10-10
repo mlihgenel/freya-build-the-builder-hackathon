@@ -237,6 +237,14 @@ staging-app.freyavoice.ai → çağrı kayıtları. Simülasyon çağrıları "S
 | 22:30 | mert-a (tekrar teklif kuralı) | PUB-06 pieces × 3 | 2/3 | floor tekrar teklifi azaldı, bitmedi |
 | 22:53 | mert-b | PUB-12 pieces × 3 | — | Freya 503 "API key validation is temporarily unavailable"; koşmadı |
 | 20:31 | mert-a | chat smoke (elle değişkenler, sahte customer_id) | akış doğru | parçalı DOB birleşti; HTTP hatasında `id_fix → reask` "could not check" dedi; submit exec 0,2–0,7 sn |
+| 23:29 | dev-a (next_offer v1) | PUB-06 × 3 | 3/3 | "çok fazla" → floor bir kez, 1. deneme tarihiyle |
+| 23:32 | dev-b (next_offer v1) | PUB-12 × 3 | 1/3 | model ürün değiştirirken "bugün"ü yine soruyordu |
+| 23:36 | dev-b (v2, ürün kimliğiyle) | PUB-12 × 3 | 0/3 | geçişsiz yolda "no speakable content" + model ürün kimliğini karıştırdı → imleç kodda (v3) |
+| 23:45 | dev-b (v3, imleç kodda) | PUB-12 × 3 | **3/3** | |
+| 23:49 | dev-a (v3) | Brief A × 3 | **10/10 pass³** | 30/30 |
+| 00:00 | dev-b (v3) | Brief B × 3 | 2/3 | PUB-13: "ikisi de 30 Ekim" → kredi 16 Ekim'e kaydedildi (gerileme) → `agreed_all` |
+| 00:10 | dev-b (v4, agreed_all) | Brief B × 3 | **3/3 pass³** | |
+| 00:15 | dev-a (v4) | Brief A × 3 | **10/10 pass³** | en yavaş tur medyanı 2–3 sn |
 
 17:45 koşusundan sonra yapılan düzeltmeler:
 - kayıt zinciri 6 adımdan 2'ye indi

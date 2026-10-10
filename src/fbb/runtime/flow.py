@@ -2,7 +2,7 @@
 
 Her fonksiyon `vars`'ı okur/yazar. Route'lar string bayraklara bakar (boolean'a değil):
 id_go: <cevabın geldiği node adı> | '' | fail      id_decl: close | explain_q<i> | ''
-commit: confirm | go_<adım> | invalid | invalid_say | ''
+commit: confirm | go_<adım> | invalid | invalid_say | offer | offer_in | propose_in | ''
 next_step: record | note | more | end_r | end_nr     cb_state: ok | invalid | gave_up | ''
 Bir node'dan çıkışı sağlayan bayrak, o node'a geri dönülmeden önce bir kod adımında temizlenir; yoksa bayrak
 eski değeriyle tekrar tetiklenir.
@@ -175,8 +175,126 @@ def readback_reset(vars, RT):
 
 
 def commit_reset(vars):
-    vars["fix_kind"] = "say" if vars.get("commit") == "invalid_say" else "model"
+    vars["fix_kind"] = "say" if vars.get("commit") in ("invalid_say", "offer") else "model"
     vars["commit"] = ""
+
+
+# --- ikna teklifleri: sayım ve cümle kodda --------------------------------------------------------------
+
+def offer_sentence(plan, k, low, st):
+    """Planın k. denemesi (1'den başlar) için teklif cümlesi (prep_account'ta hazırlanır). low: müşteri tam tutarı
+    çok buldu → floor."""
+    att = plan["attempts"][k - 1]
+    amount, text = (att["low"], att["say_low"]) if low else (att["amount"], att["say"])
+    note = plan.get("floor_note", "")
+    if note and amount < plan["past_due"] - 0.005 and not st.get("noted"):
+        st["noted"] = True
+        text = text + " " + note
+    return text, amount, att["date"]
+
+
+def next_offer(vars, RT, answer, amount="", date=""):
+    """next_offer: müşterinin ŞU ANKİ ürüne cevabı: 'refused' (düz ret / cevap yok), 'too_much' (tam tutar fazla) ya
+    da 'agreed' (amount + date).
+
+    Ürün sırası ve deneme sayısı kodda (offers_json: cur = şu anki ürünün sırası). İlk soru (bugün, tam tutar) her
+    ürün için 0. teklif sayılır. 'too_much' tutarı floor'a indirir ve tarihi korur (ilk sorudan sonra 1. denemenin
+    tarihi). Denemeler bitince ürün ikna durumuyla (refused) kapanır. Ürün bitince sıradaki ürünün 1. teklifi
+    söylenir; hepsi bitince sonuç propose_results'a verilir (read-back ya da kapanış). Her yol bir geçişle biter."""
+    try:
+        plans = json.loads(vars.get("plans_json") or "[]")
+    except Exception:
+        plans = []
+    state = json.loads(vars.get("offers_json") or "null") or dict(cur=0, items=dict(), results=[])
+    cur = int(state.get("cur", 0))
+    if not plans or cur >= len(plans):
+        vars["commit"] = "invalid"
+        vars["commit_msg"] = "next_offer: no product is open; call propose_results."
+        vars["fix_prompt"] = "Every product is settled. Call propose_results now. Do not propose anything."
+        return
+    plan = plans[cur]
+    pid = plan["product_id"]
+    st = state["items"].get(pid) or dict(n=0, low=False)
+    answer = str(answer or "").strip().lower()
+    lead = ""
+    done = ""
+    if answer.startswith("agree") and ("all" in answer or "both" in answer):
+        # Müşteri kalan bütün ürünler için tek bir gün söyledi: her ürün tam tutarıyla o güne; deadline'ı aşan ürünü
+        # doğrulama kendi deadline'ına çeker ve read-back'te söyler.
+        try:
+            when = to_date(str(date).strip()[:10])
+        except Exception:
+            when = None
+        if when is None:
+            vars["commit"] = "invalid"
+            vars["commit_msg"] = "next_offer: 'agreed_all' needs agreed_date (YYYY-MM-DD)."
+            vars["fix_prompt"] = ("Your next_offer call was not accepted: " + vars["commit_msg"] + " Call it again "
+                                  "now. Do not tell the customer anything about recording.")
+            return
+        today, _ = parse_now(vars.get(RT.get("now_var", "now")))
+        kind, _, _, note = adjust_promise(plan, plan["past_due"], when, today, effective_rt(RT, today))
+        if kind == "say":
+            vars["commit"] = "invalid_say"
+            vars["commit_say"] = note
+            vars["commit_msg"] = "NOT ACCEPTED, the customer was told: " + note
+            return
+        for rest in plans[cur:]:
+            state["results"].append(rest["product_id"] + ":" + str(rest["past_due"]) + ":" + when.isoformat())
+        state["cur"] = len(plans)
+        vars["offers_json"] = json.dumps(state)
+        vars["propose_args"] = "; ".join(state["results"])
+        vars["commit"] = "propose_in"
+        return
+    if answer.startswith("agree"):
+        try:
+            when = to_date(str(date).strip()[:10])
+            value = normalize_amount(re.sub(r"[^0-9a-zA-Z.,\- ]", "", str(amount)).replace(",", ""))
+        except Exception:
+            when, value = None, None
+        if when is None or value is None:
+            vars["commit"] = "invalid"
+            vars["commit_msg"] = "next_offer: 'agreed' needs agreed_amount (a number) and agreed_date (YYYY-MM-DD)."
+            vars["fix_prompt"] = ("Your next_offer call was not accepted: " + vars["commit_msg"] + " Call it again "
+                                  "now. Do not tell the customer anything about recording.")
+            return
+        today, _ = parse_now(vars.get(RT.get("now_var", "now")))
+        kind, _, _, note = adjust_promise(plan, value, when, today, effective_rt(RT, today))
+        if kind == "say":
+            vars["commit"] = "invalid_say"
+            vars["commit_say"] = note
+            vars["commit_msg"] = "NOT ACCEPTED, the customer was told: " + note
+            return
+        done = pid + ":" + str(value) + ":" + when.isoformat()
+    elif answer.startswith("too") and not st.get("low") and plan.get("floor") \
+            and plan["floor"] < plan["past_due"] - 0.005:
+        st["low"] = True
+        st["n"] = max(int(st.get("n", 0)), 1)
+    else:
+        st["n"] = int(st.get("n", 0)) + 1
+        if st["n"] > len(plan["attempts"]):
+            done = pid + ":" + str(RT.get("refused_status") or "refused")
+    state["items"][pid] = st
+    if done:
+        state["results"].append(done)
+        cur += 1
+        state["cur"] = cur
+        if cur >= len(plans):
+            vars["offers_json"] = json.dumps(state)
+            vars["propose_args"] = "; ".join(state["results"])
+            vars["commit"] = "propose_in"
+            return
+        plan = plans[cur]
+        pid = plan["product_id"]
+        st = state["items"].get(pid) or dict(n=0, low=False)
+        st["n"] = 1
+        state["items"][pid] = st
+        lead = plan.get("continue_say", "")
+    text, amt, when = offer_sentence(plan, st["n"], st.get("low"), st)
+    vars["offers_json"] = json.dumps(state)
+    vars["commit"] = "offer"
+    vars["commit_say"] = (lead + " " + text).strip()
+    vars["commit_msg"] = ("The system just proposed for " + pid + " (" + plan.get("wording", pid) + "): " + str(amt)
+                          + " on " + when + ". It is now the current product.")
 
 
 # --- geri arama -------------------------------------------------------------------------------------------

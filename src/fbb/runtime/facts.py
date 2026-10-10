@@ -114,13 +114,19 @@ def product_plan(product, today, RT):
         when = resolve_date_rule(att.get("date", "deadline"), today, deadline, cal)
         if when > deadline:
             when = deadline
-        attempts.append({"n": att.get("n", len(attempts) + 1), "amount": round(amount, 2), "date": when.isoformat()})
+        offer = dict(product=wording, date=spoken_date(when, RT))
+        low = min(amount, floor) if floor else amount
+        attempts.append({"n": att.get("n", len(attempts) + 1), "amount": round(amount, 2), "date": when.isoformat(),
+                         "low": round(low, 2), "say": say(RT, "offer", dict(offer, amount=fmt_money(round(amount, 2), RT))),
+                         "say_low": say(RT, "offer", dict(offer, amount=fmt_money(round(low, 2), RT)))})
     return {
         "product_id": str(product.get(field_name(RT, "product_id"), "")),
         "type": ptype,
         "wording": wording,
         "past_due": round(past_due, 2),
         "floor": round(floor, 2),
+        "floor_note": RT.get("floor_note", ""),
+        "continue_say": say(RT, "continue_with", dict(product=wording)),
         "days_late": int(num(days_late)),
         "band": band["name"],
         "max_attempts": int(band.get("attempts", len(attempts))),
@@ -148,11 +154,7 @@ def prep_account(vars, RT):
                      + "; floor " + (fmt_money(p["floor"], RT) + " (" + str(p["floor"]) + ")" if p["floor"] else "none")
                      + "; latest allowed promise date (deadline) " + p["deadline"] + " " + weekday_name(p["deadline"], RT)
                      + "; persuasion attempts allowed " + str(p["max_attempts"]))
-        lines.append("    if the customer flatly refuses this product (or does not answer):")
-        for k, a in enumerate(p["attempts"]):
-            lines.append("      refusal " + str(k + 1) + " → attempt " + str(a["n"]) + ": propose " + fmt_money(a["amount"], RT)
-                         + " on " + a["date"] + " (" + spoken_date(a["date"], RT) + ")")
-        lines.append("      refusal " + str(len(p["attempts"]) + 1) + " → no more proposals; status refused")
+        lines.append("    proposals after the first ask: " + str(len(p["attempts"])) + " (made by the system via next_offer)")
     vars["product_facts"] = "\n".join(lines) if lines else "- no late products were returned"
     latest = max([to_date(p["deadline"]) for p in plans] or [today])
     vars["day_table"] = day_table(today, add_business_days(latest, 5, RT["cal"]), RT["cal"], plans, RT)

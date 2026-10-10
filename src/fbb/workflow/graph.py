@@ -241,7 +241,25 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
         "CALL it as soon as the products are settled (see the step rules). Format: <product_id>:<amount>:<YYYY-MM-DD> "
         "or <product_id>:<status>, entries separated by ';'. The system checks it and reads it back to the customer.",
         {"results": "One entry per product separated by ';', e.g. 'p1:250.50:2026-10-16; p2:refused'."},
-        "propose_results(vars, RT, tool_arg(vars, 'propose_results', 'results', ARG_results))", rt)
+        # Tool sadece argümanı kaydeder; doğrulama tek bir propose_step node'unda (boyut: neg node'ları küçük kalır).
+        "vars['propose_args'] = tool_arg(vars, 'propose_results', 'results', ARG_results)\n"
+        "vars['commit'] = 'propose_in'", rt)
+    offer = model_tool(
+        "next_offer",
+        "CALL it, instead of speaking, every time the customer answers about the CURRENT product (the one the system "
+        "proposed last; at the start the first product): a flat refusal or no answer, 'the amount is too much', or "
+        "an agreed amount and date. The system then makes the next proposal itself (also the first one for the next "
+        "product) or, when every product is settled, reads the promises back. Never propose an amount, a date or "
+        "'today' yourself.",
+        {"result": "'refused' (flat no or no answer), 'too_much' (the amount is too high), 'agreed' (this product) "
+                   "or 'agreed_all' (one day for this and every later product, each in full).",
+         "agreed_amount": "Only for 'agreed': the amount as a number, e.g. 250.50. Otherwise ''.",
+         "agreed_date": "Only for 'agreed' and 'agreed_all': the date the customer named as YYYY-MM-DD (from the "
+                        "calendar), exactly as named. Otherwise ''."},
+        # Tool sadece argümanları kaydeder; iş tek bir offer_step node'unda (her neg node'una gömülen kod küçük kalır).
+        "vars['offer_args'] = json.dumps([tool_arg(vars, 'next_offer', 'result', ARG_result), "
+        "tool_arg(vars, 'next_offer', 'agreed_amount', ARG_agreed_amount), "
+        "tool_arg(vars, 'next_offer', 'agreed_date', ARG_agreed_date)])\nvars['commit'] = 'offer_in'", rt)
     per_product = spec.recording.mode == "per_product"
     loop = [when_eq("record_promise", "a promise to record", "next_step", "record")]
     if per_product:
@@ -250,20 +268,30 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
              when_eq(SEND, "nothing left to record", "next_step", "end_r"),
              when_eq(SEND_NR, "nothing left to record", "next_step", "end_nr")]
     neg_transitions = [
+        when_eq("offer_step", "the customer answered about the current product", "commit", "offer_in"),
+        when_eq("propose_step", "results proposed", "commit", "propose_in"),
         when_eq("readback", "results accepted, read them back", "commit", "confirm"),
         when_eq("record_note", "only statuses: notes", "commit", "go_note"),
         *([when_eq("negotiate_more", "only statuses: next product", "commit", "go_more")] if per_product else []),
         when_eq(SEND, "only statuses: close", "commit", "go_end_r"),
         when_eq(SEND_NR, "only statuses: close", "commit", "go_end_nr"),
-        when_eq("commit_fix", "results not accepted", "commit", "invalid", "invalid_say"),
+        when_eq("commit_fix", "results not accepted or a proposal to say", "commit", "invalid", "invalid_say", "offer"),
     ] + post_extra
     task = texts.negotiate_task(spec)
 
     def neg_node(name: str, on_enter: dict, first_only: bool = False) -> dict:
-        return conversation(name, task, on_enter=on_enter, first_entry_only=first_only, tools=[propose],
+        return conversation(name, task, on_enter=on_enter, first_entry_only=first_only, tools=[offer, propose],
                             transitions=neg_transitions, max_turns=60, max_turn_target="close_final")
 
     nodes["negotiate"] = neg_node("negotiate", {"type": "tts", "text": "{{debt_statement}} {{first_ask}}"}, True)
+    step_routes = [t for t in neg_transitions if t["target_node"] not in ("offer_step", "propose_step")
+                   and not t.get("is_tool_call")]
+    nodes["offer_step"] = code("offer_step", snip("next_offer(vars, RT, *json.loads(vars.get('offer_args') or '[]'))",
+                                                  "vars['commit'] = 'invalid'"),
+                               [when_eq("propose_step", "every product settled", "commit", "propose_in")] + step_routes,
+                               "commit_fix")
+    nodes["propose_step"] = code("propose_step", snip("propose_results(vars, RT, vars.get('propose_args', ''))",
+                                                      "vars['commit'] = 'invalid'"), step_routes, "commit_fix")
     nodes["commit_fix"] = code("commit_fix", snip("commit_reset(vars)"),
                                [when_eq("negotiate_fix_say", "tell the customer", "fix_kind", "say")], "negotiate_fix")
     nodes["negotiate_fix"] = neg_node("negotiate_fix", {"type": "llm", "prompt": "{{fix_prompt}}"})

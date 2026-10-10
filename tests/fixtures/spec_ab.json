@@ -201,7 +201,8 @@
       "waiver",
       "instalment plan",
       "any term not in the brief"
-    ]
+    ],
+    "floor_note": "The rest stays overdue."
   },
   "confirmation": {
     "confirm_question": "Do you confirm?",

@@ -2,10 +2,14 @@
 
 Kod: `src/fbb/workflow/graph.py`. Brief A, tek ürünlü ve notları kapalı bir Brief B gibi işlenir. Brief A ile ~43 node, ~300 KB.
 
-**Model sadece konuşur ve dört code_exec tool'u çağırır:**
+**Model sadece konuşur ve beş code_exec tool'u çağırır:**
 - `submit_answer(answer)`: müşterinin güvenlik cevabı (parça parça da olabilir; kod birleştirir)
 - `decline_questions()`: müşteri soruya cevap vermiyor ya da aramanın amacını soruyor (sayaç kodda)
-- `propose_results(results)`: müzakerenin sonucu; kod doğrular, düzeltir ve read-back cümlesini kendisi üretir
+- `next_offer(result, agreed_amount, agreed_date)`: müşterinin **şu anki** ürüne cevabı (`refused` | `too_much` |
+  `agreed` | `agreed_all`). İkna teklifleri, deneme sayısı ve ürün sırası kodda (`offers_json`); model teklif
+  uydurmaz, ürün değiştirmez, "bugün"ü tekrar sormaz. Bütün ürünler bitince sonuç kendiliğinden propose_step'e gider
+- `propose_results(results)`: müzakerenin sonucu (ret dışı durumlar ve transferler için); kod doğrular, düzeltir ve
+  read-back cümlesini kendisi üretir
 - `propose_callback(date, time)`: geri arama zamanı (üçüncü kişi ya da, brief isterse, müşterinin kendisi)
 
 Bunlar bankaya hiçbir şey yazmaz, sadece doğrulayıp bayrak koyar. Bankaya yazan bütün çağrıları engine yapar
@@ -31,9 +35,13 @@ opener (tts açılış + onay sorusu; tool-call transition'lar)
  ├─ close_wrong_number / close_deceased / close_unclear / close_id_declined / transfer_<id> / cust_cb
 fetch_account (api, tts "One moment") → prep_account (code; erken outcome = hangup_verified) → negotiate
 negotiate / negotiate_fix (llm {{fix_prompt}}) / negotiate_fix_say (tts {{commit_say}}) / negotiate_more (per_product)
+ ├─ commit=offer_in (next_offer) → offer_step (code: sıradaki teklif / sıradaki ürün / bitti)
+ │     offer → commit_fix → negotiate_fix_say (tts teklif)      bitti → propose_step
+ ├─ commit=propose_in (propose_results) → propose_step (code: doğrula, düzelt, read-back cümlesi) → aşağıdaki route'lar
+ │     (tool'lar sadece argümanı kaydeder; ağır kod tek node'da: workflow ≈300 KB)
  ├─ commit=confirm  → readback (tts {{readback_say}}; routing: evet → record_promise, hayır/değişiklik → readback_reset)
  ├─ commit=go_<adım> (promise yok, sadece durumlar) → record_note / send_close / send_close_nr / negotiate_more
- ├─ commit=invalid|invalid_say → commit_fix (code, bayrağı temizler) → negotiate_fix | negotiate_fix_say
+ ├─ commit=invalid|invalid_say|offer → commit_fix (code, bayrağı temizler) → negotiate_fix | negotiate_fix_say
  └─ transition_to_transfer_<id> → transfer_<id> (api, sabit kuyruk) → close_transfer_<id> (sabit kapanış)
 record_promise (api, ilk girişte tts "One moment") → rec_step (code) ⇄ … → record_note ⇄ note_step → send_close[_nr]
 send_close / send_close_nr: tts {{closing_speech}} + close_call → end_main
@@ -55,7 +63,7 @@ kod servisi hatası (her code node'unun guard'ı): fallback_close[_nr] (o ana ka
 | `id_say`, `id_msg` | `id_fix`, `id_take_answer` | reask tts, ask görevi | metin |
 | `products` | `fetch_account` mapping (`data.<response_fields.products>`) | `prep_account` | liste |
 | `debt_statement`, `first_ask`, `product_facts`, `day_table`, `today_*`, `tomorrow_*`, `plans_json`, `id_state` | `prep_account` | `negotiate` metni, doğrulama | metin |
-| `commit`, `commit_msg`, `commit_say`, `fix_prompt`, `fix_kind`, `readback_say`, `rec_queue`, `statuses_json` | `propose_results`, `commit_reset`, `readback_reset` | route, readback, kayıt döngüsü | confirm / go_* / invalid / invalid_say |
+| `commit`, `commit_msg`, `commit_say`, `fix_prompt`, `fix_kind`, `readback_say`, `rec_queue`, `statuses_json` | `propose_results`, `commit_reset`, `readback_reset` | route, readback, kayıt döngüsü | confirm / go_* / invalid / invalid_say / offer / offer_in / propose_in |
 | `rec_pid/amount/date`, `rec_r_ok`, `rec_try`, `recorded_json`, `failed_json`, `promises_ok`, `announced_json`, `progress_say` | `rec_pick`, `rec_after`, `next_step` | `record_promise` gövdesi, kapanış | |
 | `note_pid/reason`, `note_r_ok`, `note_i`, `note_try` | `note_pick`, `note_after` | `record_note` | |
 | `next_step` | `next_step` | rec_step/note_step route | record / more / note / end_r / end_nr |

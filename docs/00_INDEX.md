@@ -49,4 +49,5 @@ uv run fbb chat brief-a "Hello?" --case PUB-01                                  
 - Stiller (tek tekrar): in_words A 9/10, B 3/3; pieces A 9/10, B 2/3. asks_back/corrects/talkative son düzeltmelerden sonra ölçülmedi.
 - Açık: PUB-06 ve PUB-12 ikna sayımı (model; kalıcı çözüm adayı: denemeleri koda taşımak), varyant provası (simülasyonla).
 - Ham materyal provası (uydurma Brief C + varyant openapi, `tests/fixtures/variants/`): LLM çıkarımıyla uçtan uca build başarılı (lint 0). Bulunan tek eksik (floor = iki kuralın büyüğü) `floor_rule` `max:`/`min:` ile kapandı; 85 test yeşil.
+- **11 Eki ~00:30: ikna teklifleri koda taşındı** (`next_offer` + `offer_step`, `propose_step`): ürün sırası, deneme sayısı ve teklif cümleleri kodda; model sadece müşterinin cevabını bildirir. Ölçüm (dev-a/dev-b, altın spec): **A 10/10 pass³ (iki kez), B 3/3 pass³**. Workflow ≈301/305 KB (önce 315/319). Stiller bu sürümle ölçülmedi.
 - Sonuç tablosu ve test komutları: `10_TEST_REHBERI.md` §9.

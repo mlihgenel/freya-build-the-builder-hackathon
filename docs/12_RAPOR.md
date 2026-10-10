@@ -83,7 +83,7 @@ Açık kalan iki vaka modelin ikna davranışından: PUB-06 (asgari ödeme bazen
 
 ## 4. Açık işler ve riskler
 
-1. **İkna sayımı modelde (PUB-06, PUB-12).** Prompt kuralları düşüşü azalttı ama bitirmedi. Kalıcı çözüm adayı: model "müşteri bu ürünü reddetti" diye bir tool çağırır, kod deneme sayısını tutar ve teklif cümlesini üretir. Risk: brief'in istediği ek cümleler (ör. "kalan borç gecikmiş kalır") koda spec'ten taşınmalı.
+1. ✅ **(11 Eki 00:30'da kapandı: teklifler ve ürün sırası kodda, `next_offer`/`offer_step`; A 10/10, B 3/3 pass³; ayrıntı `10_TEST_REHBERI.md` §9 ve `05`.)** Eski not: **İkna sayımı modelde (PUB-06, PUB-12).** Prompt kuralları düşüşü azalttı ama bitirmedi. Kalıcı çözüm adayı: model "müşteri bu ürünü reddetti" diye bir tool çağırır, kod deneme sayısını tutar ve teklif cümlesini üretir. Risk: brief'in istediği ek cümleler (ör. "kalan borç gecikmiş kalır") koda spec'ten taşınmalı.
 2. **asks_back, corrects, talkative** son düzeltmelerden sonra ölçülmedi. İlk turdaki (eski kod) açık sorunlar: talkative'de PUB-08 promise ile kapandı, PUB-09'da transfer yapılmadı, PUB-05'te destek ekibi birden fazla teklif edildi.
 3. **Kayıt zinciri** hâlâ ürün başına bir code node'u (review C.3: ölçüm >10 sn göstermedikçe açılmayacak; şu an en yavaş tur 1–2 sn).
 4. **Tutarın tipi** (`{{rec_amount:json}}`): mock kabul ediyor, bilinçli olarak pre-hook eklenmedi.

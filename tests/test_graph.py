@@ -218,7 +218,15 @@ def _account(n, v, case, name):
 def _propose(n, v, results, node="negotiate"):
     v["propose_results_args.results"] = results
     run_snippet(_tool_code(n[node], "propose_results"), vars=v)
-    return _route(n[node], v)
+    return _step(n, v, _route(n[node], v))
+
+
+def _step(n, v, route):
+    """Tool'un kaydettiği girdi tek bir code node'unda işlenir (offer_step / propose_step)."""
+    while route in ("offer_step", "propose_step"):
+        run_snippet(_code_of(n[route]), vars=v)
+        route = _route(n[route], v)
+    return route
 
 
 def test_readback_then_record_with_retry(cat, public_cases):
@@ -536,3 +544,76 @@ def test_model_argument_with_quotes_does_not_break_snippet(cat):
         v = {}
         run_snippet(filled, vars=v)
         assert v.get("runtime_error") is None
+
+
+def _offer(n, v, result, node="negotiate", amount="", date=""):
+    v["next_offer_args.result"] = result
+    v["next_offer_args.agreed_amount"] = amount
+    v["next_offer_args.agreed_date"] = date
+    run_snippet(_tool_code(n[node], "next_offer"), vars=v)
+    route = _step(n, v, _route(n[node], v))
+    if route == "commit_fix":
+        run_snippet(_code_of(n["commit_fix"]), vars=v)
+        route = _route(n["commit_fix"], v)
+    return route
+
+
+def test_floor_offered_once_on_attempt_date(cat, public_cases):
+    """PUB-06: 'tam tutar çok fazla' → floor bir kez, 1. denemenin tarihiyle (bugün değil) ve kalan-borç notuyla."""
+    n = build_workflow(spec("spec_a.json"), cat)["nodes"]
+    v = {}
+    plan = _account(n, v, public_cases["PUB-06"], "spec_a")[0]
+    assert plan["band"] == "late" and "refusal 1" not in v["product_facts"]
+    assert _offer(n, v, "too_much") == "negotiate_fix_say"
+    floor = f"{plan['floor']:.2f}"
+    assert floor in v["commit_say"] and "Friday 16 October" in v["commit_say"]
+    assert v["commit_say"].endswith("The rest stays overdue.") and "today" not in v["commit_say"]
+    assert n["negotiate_fix_say"]["on_enter"] == {"type": "tts", "text": "{{commit_say}}"}
+    assert _offer(n, v, "too_much", "negotiate_fix_say") == "negotiate_fix_say"  # ikinci 'çok fazla' = ret
+    assert "Friday 23 October" in v["commit_say"] and "overdue" not in v["commit_say"]
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "send_close"  # deneme kalmadı → refused ile kapanış
+    assert v["close_outcome"] == "no_promise" and v["close_reason"] == "refused"
+
+
+def test_floor_agreed_goes_to_readback(cat, public_cases):
+    n = build_workflow(spec("spec_a.json"), cat)["nodes"]
+    v = {}
+    plan = _account(n, v, public_cases["PUB-06"], "spec_a")[0]
+    assert _offer(n, v, "too_much") == "negotiate_fix_say"
+    assert _offer(n, v, "agreed", "negotiate_fix_say", "10", "2026-10-16") == "negotiate_fix_say"  # floor altı
+    assert f"{plan['floor']:.2f}" in v["commit_say"] and v["offers_json"].count("p1:") == 0
+    assert _offer(n, v, "agreed", "negotiate_fix_say", str(plan["floor"]), "2026-10-16") == "readback"
+    assert "Friday 16 October" in v["readback_say"]
+
+
+def test_offers_per_product_follow_bands(cat, public_cases):
+    """PUB-12: 'bugün' ürün başına tekrar sorulmaz; ürün sırası ve deneme sayısı kodda (late 2, early 1); ürün
+    bitince sıradaki ürünün 1. teklifi; hepsi bitince read-back."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    plans = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    assert [len(p["attempts"]) for p in plans] == [2, 2, 1]
+    p1 = plans[0]
+    assert _offer(n, v, "agreed", amount=str(p1["past_due"]), date="2026-10-15") == "negotiate_fix_say"
+    said = [v["commit_say"]]
+    assert said[0].startswith("Let us continue with your") and plans[1]["product_id"] in v["commit_msg"]
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "negotiate_fix_say"
+    said.append(v["commit_say"])
+    assert all("today" not in x for x in said) and said[0] != said[1]
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "negotiate_fix_say"  # 2. ürün bitti → 3. ürün
+    assert v["commit_say"].startswith("Let us continue with your") and plans[2]["product_id"] in v["commit_msg"]
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "readback"
+    queue = json.loads(v["rec_queue"])
+    assert [q["product_id"] for q in queue] == [p1["product_id"]]
+    assert sorted(x["reason"] for x in json.loads(v["statuses_json"])) == ["refused", "refused"]
+
+
+def test_one_day_for_all_products_keeps_each_deadline(cat, public_cases):
+    """PUB-13: 'ikisini de 30 Ekim'de' → kart 30 Ekim, kredi kendi deadline'ı 23 Ekim; read-back ikisini de söyler."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    _account(n, v, public_cases["PUB-13"], "spec_ab")
+    assert _offer(n, v, "agreed_all", date="2026-10-30") == "readback"
+    queue = {q["product_id"]: q["date"] for q in json.loads(v["rec_queue"])}
+    assert queue == {"p1": "2026-10-30", "p2": "2026-10-23"}
+    assert "Friday 30 October" in v["readback_say"] and "Friday 23 October" in v["readback_say"]

@@ -18,6 +18,9 @@ How the program uses the spec:
 - The floor: `disclosure.floor_field` (product type → account field) when it is a field of the product. Otherwise
   `disclosure.floor_rule`: product type (or "*" for all) → "field:<name>", "percent:N" or "fixed:X". If the floor is
   the higher (or lower) of several of these, write "max:<rule>,<rule>" (or "min:…"), e.g. "max:percent:N,field:<name>".
+- The program makes every persuasion proposal itself from `negotiation.attempts` (amount and date). Put the sentence
+  the brief requires when a lower amount (the floor) is offered, e.g. that the rest stays overdue, in
+  `negotiation.floor_note`.
 - Callback windows: `days` items are "today", "next_business_day" or "business_days:N" (each of the next N business
   days); if the hours differ per weekday use `hours_by_weekday` ("0" = Monday … "6" = Sunday).
 - Templates use single braces: call variables (e.g. {title}, {last_name}) and fields of a product returned by the

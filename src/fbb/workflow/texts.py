@@ -148,20 +148,26 @@ def negotiate_task(spec: PolicySpec) -> str:
         bullets(spec.unmapped),
         ("Never offer: " + ", ".join(n.forbidden_offers) + ".") if n.forbidden_offers else "",
         "",
-        "PERSUASION (counted per product; every proposal you make counts):",
-        "- The facts list, per product, what to do after each flat refusal. Count the refusals of each product "
-        "(a refusal of the first question about paying counts as refusal 1 for every product it covered) and do "
-        "exactly what the matching line says: that amount on that date, as one short proposal, and nothing else.",
-        "- Say each proposal once. If the customer asks a question about it ('how much do I have to pay?'), "
-        "answer the question and ask only whether that works; do not name the amount again as a new offer.",
-        "- If an attempt's amount changes because the customer said the full amount is too much, keep that "
-        "attempt's date; never offer the lower amount for today.",
-        "- Make every listed attempt before the product counts as refused: a product with 2 attempts allowed gets "
-        "both. When its attempts are used up, its status is refused; go on with the next product.",
-        "- Any other question about paying (for example asking again whether they can pay today) also uses an "
-        "attempt, so never add one." + (" The first question about paying today covered every product at once: "
-                                        "never ask it again per product; start each product at its attempt 1."
-                                        if mp.enabled else ""),
+        "PERSUASION AND PRODUCT ORDER (the system makes every proposal and keeps the order; you never do):",
+        "- Products are settled one at a time, in the bank's order. The CURRENT product is the first one at the "
+        "start, then the one the system proposed last (see the check result below).",
+        "- Never propose an amount or a date yourself, never ask again whether they can pay today, never repeat a "
+        "proposal, and never move on to another product yourself. The first question about paying today counts as "
+        "the first ask for every product" + (" at once." if mp.enabled else ".")
+        + " Every time the customer answers about the current product, call next_offer: result='refused' for a flat "
+        "no or no answer, 'too_much' when they say the amount is too high, 'agreed' with agreed_amount and "
+        "agreed_date when they name or accept an amount and a day (look the day up in the calendar)"
+        + (", 'agreed_all' with agreed_date when they name ONE day for this and every later product (pass the day "
+           "exactly as named, even if it is after a deadline: the system moves each product to its allowed date and "
+           "says so)" if mp.enabled else "")
+        + ". If they talk about a later product first, keep it in mind and still answer for the current product "
+        "first.",
+        "- Statuses other than a refusal (" + ", ".join(st.id for st in spec.statuses if not st.persuade)
+        + ") and transfers are not next_offer answers: handle them under the rules and call propose_results with "
+        "every product.",
+        "- If the customer asks a question about the proposal, answer it and ask only whether that works.",
+        "- If the customer names their own amount or date, that is not a refusal: settle it under the rules above "
+        "and pass it with result='agreed'; the system checks it.",
         (f'- If the customer asks to change a promise that is already recorded, say: "{c.change_after_record_sentence}"'
          if c.change_after_record_sentence else ""),
         "",
@@ -170,12 +176,13 @@ def negotiate_task(spec: PolicySpec) -> str:
         (f"- {cc.trigger} → call transition_to_cust_cb." if cc.enabled and "post_verify" in cc.stages else ""),
         "",
         "FINISHING THIS STEP (very important, this overrides any rule above about reading back or confirming):",
-        ("As soon as ONE product has an agreed amount and date, or a final status, call propose_results with that "
-         "product only. The system reads it back, records it after the customer confirms, and then you continue "
-         "with the next product."
-         if per_product else
-         "As soon as every product has an agreed amount and date, or a final status, call propose_results ONCE with "
-         "one entry per product, separated by ';'."),
+        ("When every product is settled through next_offer, the system reads the promises back by itself. Call "
+         "propose_results yourself only when a product ends with a status other than a refusal or a transfer is "
+         "needed: "
+         + ("with that product only; the system reads it back, records it after the customer confirms, and then you "
+            "continue with the next product." if per_product else
+            "call propose_results ONCE with one entry per product (also the ones already settled), separated by "
+            "';'.")),
         "  - a promise: <product_id>:<amount as a number>:<YYYY-MM-DD>. Use the date the customer agreed, exactly as "
         "named, even if it is not a business day or is after a deadline: the system moves it to the allowed date and "
         "tells the customer.",

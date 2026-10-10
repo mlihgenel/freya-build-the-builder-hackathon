@@ -173,6 +173,8 @@ class Negotiation(Strict):
     attempts: list[Attempt]
     rules: list[str] = Field(..., description="Müzakere kuralları, kısa emir cümleleri (tarih, tutar, ikna, ret tanımı)")
     forbidden_offers: list[str] = Field(default_factory=list)
+    floor_note: str = Field("", description="Floor (ya da borçtan düşük bir tutar) ilk kez teklif edilirken brief'in "
+                            "söylenmesini istediği cümle, ör. kalan borcun gecikmiş kalacağı; yoksa boş")
 
 
 class Confirmation(Strict):
@@ -294,6 +296,8 @@ class Locale(Strict):
     past_date: str = Field("That date has already passed. Could you pay by {date}?",
                            description="Tarih geçmişteyse")
     continue_with: str = Field("Let us continue with your {product}.", description="per_product modunda")
+    offer: str = Field("Could you pay {amount} for your {product} on {date}?",
+                       description="Kodun yaptığı ikna teklifi; {amount} {date} {product}")
 
     @field_validator("weekday_names")
     @classmethod
@@ -502,6 +506,9 @@ def to_runtime(spec: PolicySpec) -> dict:
         "debt_sentence": spec.disclosure.debt_sentence,
         "first_ask_single": spec.negotiation.first_ask_single,
         "first_ask_multi": spec.negotiation.first_ask_multi or spec.negotiation.first_ask_single,
+        "floor_note": spec.negotiation.floor_note,
+        "refused_status": next((st.id for st in spec.statuses if st.persuade),
+                               spec.statuses[0].id if spec.statuses else "refused"),
         "attempts": [a.model_dump() for a in spec.negotiation.attempts],
         "money": spec.money.model_dump(),
         "callback": spec.third_party.callback.model_dump(),

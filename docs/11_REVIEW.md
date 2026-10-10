@@ -178,7 +178,7 @@ Her madde kodda, birim testte ve (mümkünse) platformda. "Ölçüm bekliyor" = 
 | 21 | ⚠️ bilinçli karar | `rec_amount` kodda sayı olarak yazılıyor ve `{{rec_amount:json}}` ile gidiyor; pre-hook ile tip çevirme eklenmedi (her kayıtta +1 code exec ve kod servisine bağımlılık). Kullanılmayan `coerce_body` kaldırıldı. Bir sonraki koşuda `fbb call` ile gövdedeki tip kontrol edilecek | `flow.rec_pick` |
 | 22 | ✅ | Snippet'ler yorumsuz/docstring'siz (`ast.unparse`), RT sadece kullanılan anahtarlarla gömülü; kimlik varyantları tek `reask`'te. 43 node ≈300 KB (önce 322 KB), test sınırı 340 KB | `emit.prune_rt/_compact`, `test_workflow_lints_clean` |
 | 23 | ✅ | 00, 02, 03, 04, 05, 06, 07, 08, 10 güncellendi | |
-| 24 | 🟡 | Sayım hâlâ modelde. PUB-12 0/3–1/3 düştü (ürün başına 'bugün' tekrar soruldu, late bandında 2. deneme atlandı) → negotiate görevine genel ikna kuralları; sonra B 3/3 pass³. A'da PUB-06 1/3 benzer bir sapma (1. deneme atlandı) | `texts.negotiate_task` |
+| 24 | ✅ (11 Eki 00:30) ikna teklifleri ve ürün sırası kodda (`next_offer`/`offer_step`); A 10/10, B 3/3 pass³. Önceki not: | Sayım hâlâ modelde. PUB-12 0/3–1/3 düştü (ürün başına 'bugün' tekrar soruldu, late bandında 2. deneme atlandı) → negotiate görevine genel ikna kuralları; sonra B 3/3 pass³. A'da PUB-06 1/3 benzer bir sapma (1. deneme atlandı) | `texts.negotiate_task` |
 
 **Ölçüm (VPN ile, 20:41–20:56):** A 9/10 pass³ (önce 3/10), B 3/3 pass³ (önce 2/3); en yavaş tur medyanı 1–2 sn. Ayrıntı `10_TEST_REHBERI.md` §9. Ölçüm sırasında bir bug bulundu ve düzeltildi: `id_take_answer` `id_q`'yu yazmıyordu (yanlış 2. cevaptan sonra 1. soru soruluyordu).
 

@@ -86,7 +86,8 @@
       "If the customer mentions illness, a death in the family or job loss: say one short sentence of sympathy, make no persuasion attempt, and offer to connect them with the customer support team. If they decline, end with status hardship. If they still name a date or an amount themselves, record the promise.",
       "If the customer says twice that they do not want to talk, end with status refused."
     ],
-    "forbidden_offers": ["discount", "waiver", "instalment plan", "any term not in the brief"]
+    "forbidden_offers": ["discount", "waiver", "instalment plan", "any term not in the brief"],
+    "floor_note": "The rest stays overdue."
   },
   "confirmation": {
     "confirm_question": "Do you confirm?",
