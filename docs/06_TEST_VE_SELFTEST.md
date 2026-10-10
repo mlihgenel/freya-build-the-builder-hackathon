@@ -15,9 +15,9 @@
 
 | Dosya | Kapsam |
 |---|---|
-| `test_runtime.py` | Brief A deadline'ları (23 Eki late, 2 Kas early), Cuma kuralları, PUB-07 tatil; DOB'nin kelimeyle söylenmesi; rakamlar ve tutarlar; ürün gerçekleri; teklif doğrulama; callback penceresi; kapanış tablosu; 120 günlük diferansiyel test |
+| `test_runtime.py` | Brief A deadline'ları (23 Eki late, 2 Kas early), Cuma kuralları, PUB-07 tatil; DOB'nin kelimeyle söylenmesi; rakamlar ("double four" dahil) ve tutarlar; parçalı cevapların birleştirilmesi; gün/ay ipucundan sonra sadece ay; postcode/alnum; ürün gerçekleri; öneri doğrulama ve otomatik düzeltme (deadline'a çekme, iş gününe kaydırma, read-back cümlesi); floor/tutar/deadline kuralları; tarihli override'lar; hafta sonu callback; kapanış tablosu; 120 günlük diferansiyel test |
 | `test_spec.py` | 7 tool, enum'lar; fixture'lar şemadan ve cross_check'ten geçiyor; çakışan bantlar reddediliyor; spec→RT ile elle yazılmış RT aynı |
-| `test_graph.py` | lint temiz (A ve A+B); hash deterministik; system prompt amaç kelimesi içermiyor; PUB-01 kimlik döngüsü; 3 yanlış; PUB-10 kayıt yeniden denemesi + close pre-hook; PUB-12 notlar; tutarın sayıya çevrilmesi; veda cümlesinin doldurulması |
+| `test_graph.py` | lint temiz ve boyut (A ve A+B); hash deterministik; system prompt amaç kelimesi içermiyor; route simülasyonu (`_route`): kodsuz kimlik mutlu yolu, yanlış/ipucu/500, ret açıklaması bir kez; read-back → kayıt + tekrar deneme; read-back reddi; geçersiz teklifin tts ile söylenmesi; PUB-12 notlar; sadece durumlar; per_product modu; statik transfer ve kapanışlar; lifecycle yedeği pre-hook'u; fallback guard'ları; müşteri callback'i; **varyant openapi** (alan adları değişmiş, `ok` yok, fazladan zorunlu alan) çökmeden kurulur; soru başına gövde alanı / all_at_once; tırnaklı model argümanı |
 | `test_no_hardcoded_brief.py` | `src/` altında A/B değeri yok |
 
 ## L4 ölçütü

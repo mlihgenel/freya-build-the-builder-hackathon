@@ -12,7 +12,7 @@ from pathlib import Path
 from fbb import config
 from fbb.ingest.openapi import load_catalog
 from fbb.ingest.sources import read_sources, slot_for
-from fbb.spec import PolicySpec, cross_check
+from fbb.spec import PolicySpec, cross_check, resolve_response_fields
 from fbb.trace import Trace
 from fbb.workflow.graph import build_workflow, workflow_hash
 from fbb.workflow.lint import lint
@@ -48,6 +48,9 @@ def run_build(opts: BuildOptions) -> dict:
             from fbb.ingest.extract import extract_spec
 
             spec = extract_spec(read_sources(opts.briefs), cat, trace, audit=opts.audit)
+        fixes = resolve_response_fields(spec, cat)
+        if fixes:
+            trace.event("response_fields", f"{len(fixes)} cevap alanı openapi'ye göre eşlendi", fixes=fixes)
         config.OUT.mkdir(parents=True, exist_ok=True)
         spec_path = config.OUT / f"{slot}.spec.json"
         spec_path.write_text(spec.model_dump_json(indent=1))
@@ -58,11 +61,13 @@ def run_build(opts: BuildOptions) -> dict:
         wf = build_workflow(spec, cat)
         wf_path = config.OUT / f"{slot}.workflow.json"
         wf_path.write_text(json.dumps(wf, indent=1, ensure_ascii=False))
+        warnings: list[str] = []
         problems = lint(wf, cat, call_vars=spec.call_variables.all,
-                        forbidden_pre_verify=spec.opening.forbidden_before_verification)
-        trace.event("workflow", f"{len(wf['nodes'])} node, hash {workflow_hash(wf)}, lint {len(problems)} sorun",
-                    path=str(wf_path), lint=problems, bytes=len(json.dumps(wf)))
-        result.update(spec=str(spec_path), workflow=str(wf_path), lint=problems)
+                        forbidden_pre_verify=spec.opening.forbidden_before_verification, warnings=warnings)
+        trace.event("workflow", f"{len(wf['nodes'])} node, hash {workflow_hash(wf)}, lint {len(problems)} sorun, "
+                    f"{len(warnings)} uyarı", path=str(wf_path), lint=problems, warnings=warnings,
+                    bytes=len(json.dumps(wf)))
+        result.update(spec=str(spec_path), workflow=str(wf_path), lint=problems, warnings=warnings)
         if problems:
             raise RuntimeError("lint hataları: " + "; ".join(problems[:5]))
         if not opts.deploy:
@@ -112,5 +117,8 @@ def _diff_stored(sent: dict, stored: dict) -> list[str]:
             if node.get(key) and not s.get(key):
                 lost.append(f"{name}.{key} kayboldu")
     if sent.get("tools") and not stored.get("tools"):
-        lost.append("üst seviye tools (close_call lifecycle) kayboldu")
+        lost.append("üst seviye tools (close_call lifecycle yedeği) kayboldu")
+    for a, b in zip(sent.get("tools", []), stored.get("tools", []), strict=False):
+        if a.get("pre_process_code") and not b.get("pre_process_code"):
+            lost.append("close_call lifecycle yedeğinin pre-hook'u kayboldu")
     return lost

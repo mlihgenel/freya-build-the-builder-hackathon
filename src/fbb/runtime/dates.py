@@ -7,6 +7,7 @@ Kurallar (emit.py bunları zorunlu kılar):
   Pazartesi = 0.
 """
 import datetime
+import json
 
 
 def parse_now(text):
@@ -118,35 +119,126 @@ def resolve_date_rule(rule, today, deadline, cal):
     return deadline
 
 
-def weekday_name(day):
-    return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][to_date(day).weekday()]
+WEEKDAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+             "November", "December"]
 
 
-def month_name(month):
-    return ["January", "February", "March", "April", "May", "June", "July", "August", "September",
-            "October", "November", "December"][month - 1]
+def weekday_name(day, RT=None):
+    names = ((RT or dict()).get("locale") or dict()).get("weekday_names") or WEEKDAYS_EN
+    return names[to_date(day).weekday()]
 
 
-def spoken_date(day):
+def month_name(month, RT=None):
+    names = ((RT or dict()).get("locale") or dict()).get("month_names") or MONTHS_EN
+    return names[month - 1]
+
+
+def spoken_date(day, RT=None):
     day = to_date(day)
-    return weekday_name(day) + " " + str(day.day) + " " + month_name(day.month)
+    return weekday_name(day, RT) + " " + str(day.day) + " " + month_name(day.month, RT)
 
 
-def promise_verdict(day, plan, cal):
+def last_business_day_on_or_before(day, cal):
+    day = to_date(day)
+    for _ in range(60):
+        if is_business_day(day, cal):
+            return day
+        day = day - datetime.timedelta(days=1)
+    return day
+
+
+def deadline_for(band, today, cal):
+    """Bandın son tarihi. deadline_rule boşsa deadline_bd (bugünden sonraki N. iş günü)."""
+    rule = str(band.get("deadline_rule") or "")
+    today = to_date(today)
+    if rule.startswith("business_days:"):
+        return add_business_days(today, int(rule.split(":", 1)[1]), cal)
+    if rule.startswith("calendar_days:"):
+        last = to_date(today) + datetime.timedelta(days=int(rule.split(":", 1)[1]))
+        return max(last_business_day_on_or_before(last, cal), next_business_day(today, cal, include_today=True))
+    if rule == "end_of_month":
+        nxt = datetime.date(today.year + (1 if today.month == 12 else 0), 1 if today.month == 12 else today.month + 1, 1)
+        last = last_business_day_on_or_before(nxt - datetime.timedelta(days=1), cal)
+        return last if last >= today else next_business_day(today, cal, include_today=True)
+    if rule.startswith("date:"):
+        return to_date(rule[5:])
+    return add_business_days(today, int(band.get("deadline_bd", 0)), cal)
+
+
+def effective_rt(RT, today):
+    """Memo'ların tarihli değişikliklerini (RT['overrides']) `today`'e göre uygular; RT'nin kopyasını döner."""
+    overrides = RT.get("overrides") or []
+    if not overrides:
+        return RT
+    out = json.loads(json.dumps(RT))
+    iso = to_date(today).isoformat()
+    for o in overrides:
+        start = str(o.get("effective_from") or "")
+        until = str(o.get("effective_until") or "")
+        if (start and iso < start) or (until and iso > until):
+            continue
+        if o.get("bands"):
+            out["bands"] = o["bands"]
+        if o.get("weekdays"):
+            out["cal"]["weekdays"] = o["weekdays"]
+        hol = [h for h in out["cal"].get("holidays", []) if h not in (o.get("holidays_remove") or [])]
+        out["cal"]["holidays"] = sorted(set(hol + list(o.get("holidays_add") or [])))
+        if o.get("callback"):
+            out["callback"] = o["callback"]
+        if o.get("floor_rule"):
+            merged = dict(out.get("floor_rule") or dict())
+            merged.update(o["floor_rule"])
+            out["floor_rule"] = merged
+        if o.get("attempts"):
+            out["attempts"] = o["attempts"]
+    return out
+
+
+def callback_days(today, cb, cal):
+    """Geri arama yapılabilecek günler. 'today' sadece bugün iş günüyse sayılır."""
+    days = []
+    for rule in cb.get("days") or ["today", "next_business_day"]:
+        if rule == "today" and is_business_day(today, cal):
+            days.append(to_date(today))
+        elif rule == "next_business_day":
+            days.append(next_business_day(today, cal))
+        elif str(rule).startswith("business_days:"):
+            day = to_date(today)
+            for _ in range(int(str(rule).split(":", 1)[1])):
+                day = next_business_day(day, cal)
+                days.append(day)
+    out = []
+    for d in days:
+        if d not in out:
+            out.append(d)
+    return sorted(out)
+
+
+def callback_window(day, cb):
+    """O günün saat aralığı: (başlangıç, bitiş) 'HH:MM'."""
+    by_day = cb.get("hours_by_weekday") or dict()
+    win = by_day.get(str(to_date(day).weekday()))
+    if win:
+        return win.get("start", cb.get("start", "00:00")), win.get("end", cb.get("end", "23:59"))
+    return cb.get("start", "00:00"), cb.get("end", "23:59")
+
+
+def promise_verdict(day, plan, cal, RT=None):
     """Müşteri bu günü söylerse bu ürün için ne yapılır: 'OK' ya da önerilecek tarih."""
     deadline = to_date(plan["deadline"])
     if day > deadline:
-        return "after its deadline: offer the deadline " + deadline.isoformat() + " " + weekday_name(deadline)
+        return "after its deadline: offer the deadline " + deadline.isoformat() + " " + weekday_name(deadline, RT)
     if not is_business_day(day, cal):
         nxt = next_business_day(day, cal)
         if nxt > deadline:
             return "not a business day and the next one is after its deadline: offer the deadline " + \
-                deadline.isoformat() + " " + weekday_name(deadline)
-        return "not a business day: offer the next business day " + nxt.isoformat() + " " + weekday_name(nxt)
+                deadline.isoformat() + " " + weekday_name(deadline, RT)
+        return "not a business day: offer the next business day " + nxt.isoformat() + " " + weekday_name(nxt, RT)
     return "OK, can be recorded"
 
 
-def day_table(today, until, cal, plans=None):
+def day_table(today, until, cal, plans=None, RT=None):
     """Modelin göreceği takvim. Her satır: ISO tarih, gün adı, this/next etiketi, iş günü mü ve (ürünler verilirse)
     müşteri o günü söylerse her ürün için hazır karar. Model tarih hesabı yapmaz, satırı okur.
 
@@ -164,18 +256,18 @@ def day_table(today, until, cal, plans=None):
             tags.append("tomorrow")
         wk = (week_start(day) - this_week).days // 7
         if wk == 0:
-            tags.append("this " + weekday_name(day))
+            tags.append("this " + weekday_name(day, RT))
         elif wk == 1:
-            tags.append("next " + weekday_name(day))
+            tags.append("next " + weekday_name(day, RT))
         if is_business_day(day, cal):
             status = "business day"
         elif day.isoformat() in cal.get("holidays", []):
             status = "HOLIDAY"
         else:
             status = "weekend"
-        line = day.isoformat() + " " + weekday_name(day) + (" (" + ", ".join(tags) + ")" if tags else "") + ": " + status
+        line = day.isoformat() + " " + weekday_name(day, RT) + (" (" + ", ".join(tags) + ")" if tags else "") + ": " + status
         for plan in plans or []:
-            line += " | " + plan["product_id"] + ": " + promise_verdict(day, plan, cal)
+            line += " | " + plan["product_id"] + ": " + promise_verdict(day, plan, cal, RT)
         lines.append(line)
         day = day + datetime.timedelta(days=1)
     return "\n".join(lines)

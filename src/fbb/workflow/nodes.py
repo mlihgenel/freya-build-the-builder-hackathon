@@ -15,6 +15,17 @@ def when_eq(target: str, desc: str, variable: str, *values: str) -> dict:
         {"variable": variable, "operator": "equals", "operand": v} for v in values]}}
 
 
+def when_all(target: str, desc: str, *checks: tuple[str, str, object]) -> dict:
+    """VE koşulu: (değişken, operatör, değer) üçlüleri, kitin istediği gibi üst seviyedeki VEYA grubunun içinde."""
+    return {"target_node": target, "description": desc, "condition": {"logic": "or", "conditions": [
+        {"logic": "and", "conditions": [{"variable": v, "operator": op, "operand": x} for v, op, x in checks]}]}}
+
+
+def intent(target: str, desc: str) -> dict:
+    """Routing modelinin müşterinin son mesajına bakarak verdiği karar (tool çağrısı gerekmez)."""
+    return {"target_node": target, "description": desc, "condition": {"operator": "matches_intent", "description": desc}}
+
+
 def when_gt(target: str, desc: str, variable: str, value: int) -> dict:
     return {"target_node": target, "description": desc, "condition": {"logic": "or", "conditions": [
         {"variable": variable, "operator": "greater_than", "operand": value}]}}
@@ -49,11 +60,16 @@ def conversation(name: str, task: str, *, on_enter: dict | None = None, tools: l
 
 
 def code(name: str, snippet: str, transitions: list, default_target: str, timeout_ms: int = 30000,
-         guard: str = "") -> dict:
+         guard: str = "", guard_nr: str = "") -> dict:
     """Code node. `guard`: kod servisi bu node'u çalıştıramazsa (platformun `<node>_failure_count` sayacı)
-    gidilecek node. Yoksa değişkenler güncellenmez ve döngüler sonsuza kadar döner (10 Ekim'de görüldü)."""
+    gidilecek node. Yoksa değişkenler güncellenmez ve döngüler sonsuza kadar döner (10 Ekim'de görüldü).
+    `guard_nr`: aynı durumda kapanış reason'sız olmalıysa (close_kind=noreason) gidilecek node."""
     if guard:
-        transitions = [when_gt(guard, f"code service failed in {name}", f"{name}_failure_count", 0)] + transitions
+        fail = [when_gt(guard, f"code service failed in {name}", f"{name}_failure_count", 0)]
+        if guard_nr:
+            fail.insert(0, when_all(guard_nr, f"code service failed in {name}, close without reason",
+                                    (f"{name}_failure_count", "greater_than", 0), ("close_kind", "equals", "noreason")))
+        transitions = fail + transitions
     return {
         "name": name,
         "node_type": "code",
@@ -76,13 +92,15 @@ def code(name: str, snippet: str, transitions: list, default_target: str, timeou
 
 
 def api_request(name: str, call: dict, mapping: list[tuple[str, str]], default_target: str,
-                transitions: list | None = None, on_enter: dict | None = None) -> dict:
+                transitions: list | None = None, on_enter: dict | None = None, first_entry_only: bool = False) -> dict:
+    """Engine'in yaptığı banka çağrısı. on_enter tts: bekleme sırasında söylenen kısa sabit cümle."""
     return {
         "name": name,
         "node_type": "api_request",
         "passthrough": True,
         "passthrough_default_transition": default_target,
         "on_enter": on_enter or {"type": "silent"},
+        "on_enter_first_entry_only": first_entry_only,
         "pre_actions": [call],
         "response_mapping": [{"path": p, "variable": v} for p, v in mapping],
         "transitions": (transitions or []) + [always(default_target)],

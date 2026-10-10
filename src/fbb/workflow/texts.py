@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 
+from fbb.runtime.flow import without_placeholders  # noqa: F401  (graph.py kullanır)
 from fbb.spec import PolicySpec
 
 
@@ -42,22 +43,30 @@ def system_prompt(spec: PolicySpec) -> str:
     return "\n".join(lines)
 
 
+def _nth(n: int) -> str:
+    return {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth"}.get(n, f"{n}th")
+
+
 def opener_task(spec: PolicySpec) -> str:
     o = spec.opening
+    cc = spec.customer_callback
+    asks = max(o.max_asks, 1)
     return "\n".join([
         f'You have just said: "{o.first_sentence} {tpl(o.confirm_question)}"',
         "Your only job in this step is to find out who is on the line.",
         f"Only these count as confirmation that you are speaking with the customer: {', '.join(o.accepted_confirmations)}.",
         (f"These are NOT confirmation: {', '.join(o.not_confirmations)}." if o.not_confirmations else ""),
         "Decide after each answer:",
-        "- The customer clearly confirms → call transition_to_identity_check at once, without speaking.",
+        "- The customer clearly confirms → call transition_to_ask_q0 at once, without speaking.",
         "- Someone else answered (a relative, a colleague) → call transition_to_third_party at once, without speaking.",
         "- The person says the number does not belong to the customer → call transition_to_close_wrong_number.",
         "- The person says the customer has died → call transition_to_close_deceased.",
         f'- Anything else (a question, "hello", "who is this", silence): answer the question briefly if there is one '
-        f'(you may repeat the opening sentence), then ask again: "{tpl(o.confirm_question)}". If the answer to that '
-        f"second ask is still not a confirmation, call transition_to_close_unclear.",
+        f'(you may repeat the opening sentence), then ask again: "{tpl(o.confirm_question)}". You may ask '
+        f"{asks} times in total. If the answer to the {_nth(asks)} ask is still not a confirmation, call "
+        "transition_to_close_unclear.",
         "- The person refuses to talk a second time → call transition_to_close_id_declined.",
+        (f"- {cc.trigger} → call transition_to_cust_cb." if cc.enabled and "pre_identity" in cc.stages else ""),
         _human_rule(spec, "pre_identity"),
         "Never say why you are calling. Never say any of these words: "
         + ", ".join(o.forbidden_before_verification) + ".",
@@ -73,31 +82,42 @@ def _human_rule(spec: PolicySpec, stage: str) -> str:
     return "\n".join(out)
 
 
-def identity_task(spec: PolicySpec) -> str:
+def identity_task(spec: PolicySpec, spoken: str) -> str:
     i = spec.identity
+    cc = spec.customer_callback
+    purpose = (" Asking what the call is about instead of answering also counts as refusing."
+               if i.purpose_question_counts_as_decline else "")
     return "\n".join([
-        "This step is the security check. You have just asked the customer: \"{{id_say}}\"",
+        f'This step is the security check. You have just said: "{tpl(spoken)}"',
         "- When the customer answers that question, call submit_answer with their answer exactly as they said it "
         "(words are fine, do not convert). Do not speak before the call. Never guess or fill in an answer yourself.",
         "- If a message contains an answer AND a question or complaint, it is an answer: call submit_answer first. "
         "Only a message with no answer at all can count as refusing.",
-        "- If they give only part of a number or a date, ask for the rest, then call submit_answer with the whole answer.",
+        "- If they give only part of a number or a date, call submit_answer with that part anyway: the system keeps "
+        "it and asks for the rest. Call submit_answer again with whatever they add.",
+        "- Never stall or say you are waiting or have a technical issue: every answer goes to submit_answer at once.",
         "- If they ask a question back, answer it briefly in one sentence and ask the security question again.",
-        f'- If they refuse to answer or ask what the call is about instead: the first time say "{i.decline_explain}" '
-        "and ask the question again. The second time, call transition_to_close_id_declined.",
+        f"- If they refuse to answer the security question, call decline_questions. Do not speak before the call: the "
+        f"system says what is needed.{purpose}",
         "- Never say why you are calling and never mention any product or amount in this step.",
+        (f"- {cc.trigger} → call transition_to_cust_cb." if cc.enabled and "pre_identity" in cc.stages else ""),
         _human_rule(spec, "pre_identity"),
         "Note from the last check: {{id_msg}}",
     ]).strip()
 
 
-def negotiate_task(spec: PolicySpec) -> str:
-    n, c, mp = spec.negotiation, spec.confirmation, spec.multi_product
-    statuses = "\n".join(f'  - {s.id}: {s.trigger}' + (f' Say: "{s.say}"' if s.say else "") for s in spec.statuses)
-    transfers = "\n".join(
+def _transfers_text(spec: PolicySpec) -> str:
+    return "\n".join(
         f'- {t.trigger} ' + (f'First ask once: "{t.ask_first}". If they insist, ' if t.ask_first else "")
         + (f'say "{t.say}" and ' if t.say else "") + f"call transition_to_transfer_{t.id}."
         for t in spec.transfers if "post_verify" in t.stages)
+
+
+def negotiate_task(spec: PolicySpec) -> str:
+    n, c, mp = spec.negotiation, spec.confirmation, spec.multi_product
+    cc = spec.customer_callback
+    per_product = spec.recording.mode == "per_product"
+    statuses = "\n".join(f'  - {s.id}: {s.trigger}' + (f' Say: "{s.say}"' if s.say else "") for s in spec.statuses)
     parts = [
         "The customer is verified. You have just told them: \"{{debt_statement}} {{first_ask}}\"",
         "",
@@ -115,35 +135,73 @@ def negotiate_task(spec: PolicySpec) -> str:
         "a day, do what that row says for the product: 'OK' means accept the day; otherwise offer exactly the date "
         "the row gives.",
         "",
+        "AMOUNTS AND DATES IN PIECES: customers often say a number or a date in two parts or correct themselves. "
+        "A message that is only a number ('30.', 'Twenty.', 'Six hundred.') or that stops mid-sentence ('on "
+        "October', 'I want to pay both on 3') is usually only the first part: do not use it yet, ask 'Sorry, the "
+        "full amount?' or 'Which day exactly?' and wait for the rest. Never treat such a part as an offer or a "
+        "refusal. Always use their final, corrected value.",
+        "",
         "RULES:",
         bullets(n.rules),
         bullets(mp.rules) if mp.enabled else "",
-        (f'- With several products: settle every product first WITHOUT asking for confirmation. Then read all '
-         f'promises back together in ONE message and ask "{c.confirm_question}" ONCE. Never ask for a confirmation '
-         f'per product.') if mp.enabled else "",
-        bullets(c.rules),
         bullets(spec.general_rules),
         bullets(spec.unmapped),
         ("Never offer: " + ", ".join(n.forbidden_offers) + ".") if n.forbidden_offers else "",
-        "Persuasion attempts are listed per product in the facts. Use them in order and only as many as allowed.",
+        "",
+        "PERSUASION (counted per product; every proposal you make counts):",
+        "- The facts list, per product, what to do after each flat refusal. Count the refusals of each product "
+        "(a refusal of the first question about paying counts as refusal 1 for every product it covered) and do "
+        "exactly what the matching line says: that amount on that date, as one short proposal, and nothing else.",
+        "- Say each proposal once. If the customer asks a question about it ('how much do I have to pay?'), "
+        "answer the question and ask only whether that works; do not name the amount again as a new offer.",
+        "- If an attempt's amount changes because the customer said the full amount is too much, keep that "
+        "attempt's date; never offer the lower amount for today.",
+        "- Make every listed attempt before the product counts as refused: a product with 2 attempts allowed gets "
+        "both. When its attempts are used up, its status is refused; go on with the next product.",
+        "- Any other question about paying (for example asking again whether they can pay today) also uses an "
+        "attempt, so never add one." + (" The first question about paying today covered every product at once: "
+                                        "never ask it again per product; start each product at its attempt 1."
+                                        if mp.enabled else ""),
+        (f'- If the customer asks to change a promise that is already recorded, say: "{c.change_after_record_sentence}"'
+         if c.change_after_record_sentence else ""),
         "",
         "TRANSFERS:",
-        transfers,
+        _transfers_text(spec),
+        (f"- {cc.trigger} → call transition_to_cust_cb." if cc.enabled and "post_verify" in cc.stages else ""),
         "",
-        "FINISHING THIS STEP (very important):",
-        "When every product has either a confirmed promise or a final status, call submit_results ONCE with one "
-        "entry per product, separated by ';':",
-        f'  - a promise: <product_id>:<amount as a number>:<YYYY-MM-DD>. Only after you read the product, the amount '
-        f'and the date back and the customer clearly said yes to "{c.confirm_question}".',
+        "FINISHING THIS STEP (very important, this overrides any rule above about reading back or confirming):",
+        ("As soon as ONE product has an agreed amount and date, or a final status, call propose_results with that "
+         "product only. The system reads it back, records it after the customer confirms, and then you continue "
+         "with the next product."
+         if per_product else
+         "As soon as every product has an agreed amount and date, or a final status, call propose_results ONCE with "
+         "one entry per product, separated by ';'."),
+        "  - a promise: <product_id>:<amount as a number>:<YYYY-MM-DD>. Use the date the customer agreed, exactly as "
+        "named, even if it is not a business day or is after a deadline: the system moves it to the allowed date and "
+        "tells the customer.",
         "  - no promise: <product_id>:<status>, where status is one of:",
         statuses,
         "  Example: p1:250.50:2026-10-16; p2:refused",
-        "- Do not say that anything is recorded: the system records the promises after submit_results and tells the "
-        "customer. Do not say goodbye: the system closes the call.",
-        "- If submit_results answers that nothing was recorded, explain the problem in one sentence and continue.",
+        f'- Do NOT read the promises back and do NOT ask "{c.confirm_question}" yourself: after propose_results the '
+        "system reads every promise back (product, amount, date) and asks for the confirmation.",
+        "- Never say that anything is recorded or saved: the system says it after the bank confirms. Do not say "
+        "goodbye: the system closes the call.",
         "Last check result: {{commit_msg}}",
     ]
     return "\n".join(p for p in parts if p is not None).strip()
+
+
+def readback_task(spec: PolicySpec) -> str:
+    c = spec.confirmation
+    return "\n".join([
+        "You have just read the customer's promises back and asked for confirmation: \"{{readback_say}}\"",
+        "No tool call is allowed in this step; the system acts on the customer's answer.",
+        f'- If the customer asks a question, answer it in one short sentence and ask "{c.confirm_question}" again.',
+        "- Never change an amount or a date yourself and never say that anything is recorded or saved.",
+        bullets(c.rules),
+        "TRANSFERS:",
+        _transfers_text(spec),
+    ]).strip()
 
 
 def third_party_task(spec: PolicySpec) -> str:
@@ -159,5 +217,18 @@ def third_party_task(spec: PolicySpec) -> str:
         "If they say the customer has died, call transition_to_close_deceased. If they will not give any time, "
         "call transition_to_close_no_callback.",
         "Never say why you are calling and never answer questions about the customer's account.",
+        "Last check result: {{cb_msg}}",
+    ]).strip()
+
+
+def customer_callback_task(spec: PolicySpec) -> str:
+    cc = spec.customer_callback
+    return "\n".join([
+        "The customer wants to be called back later.",
+        f'Ask when they can be called: "{cc.ask}"' if cc.ask else "Ask when they can be called back.",
+        "{{cb_facts}}",
+        "When the customer names a day and a time, turn them into YYYY-MM-DD and HH:MM (24-hour clock) and call "
+        "propose_callback. Do not decide yourself whether the time is allowed: the system checks it.",
+        "If they will not give any time, call transition_to_close_final.",
         "Last check result: {{cb_msg}}",
     ]).strip()

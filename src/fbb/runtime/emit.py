@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -22,6 +23,17 @@ class SnippetError(ValueError):
     pass
 
 
+def _compact(node: ast.AST) -> str:
+    """Kaynağı yorumsuz ve docstring'siz yazar (her snippet bütün fonksiyonları gömdüğü için boyut önemli)."""
+    node = copy.deepcopy(node)
+    for n in ast.walk(node):
+        body = getattr(n, "body", None)
+        if isinstance(n, (ast.FunctionDef, ast.ClassDef, ast.Module)) and body and isinstance(body[0], ast.Expr) \
+                and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+            n.body = body[1:] or [ast.Pass()]
+    return ast.unparse(node)
+
+
 @lru_cache(maxsize=1)
 def _definitions() -> dict[str, tuple[str, set[str]]]:
     """Ad → (kaynak, kullandığı adlar). Fonksiyonlar ve modül seviyesindeki sabitler."""
@@ -31,7 +43,7 @@ def _definitions() -> dict[str, tuple[str, set[str]]]:
         tree = ast.parse(src)
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.Assign)):
-                seg = ast.get_source_segment(src, node)
+                seg = _compact(node)
                 used = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
                 if isinstance(node, ast.FunctionDef):
                     defs[node.name] = (seg, used)
@@ -57,6 +69,25 @@ def _closure(entry_code: str) -> list[str]:
     return sorted(seen, key=order.index)
 
 
+def _strings(code: str) -> set[str]:
+    return {n.value for n in ast.walk(ast.parse(code)) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+
+
+def prune_rt(rt: dict, entry_code: str) -> dict:
+    """Snippet'in kullanmadığı RT anahtarlarını atar (workflow boyutu: her snippet RT'yi gömer).
+
+    Bir anahtar, giriş kodunda ya da kapanıştaki bir fonksiyonda metin sabiti olarak geçiyorsa kalır. Tarihli
+    değişiklikleri uygulayan `effective_rt` değiştirebileceği bütün anahtarları tutar."""
+    defs = _definitions()
+    names = _closure(entry_code)
+    used = _strings(entry_code)
+    for name in names:
+        used |= _strings(defs[name][0])
+    if "effective_rt" in names:
+        used |= {"overrides", "bands", "cal", "callback", "customer_callback", "floor_rule", "attempts"}
+    return {k: v for k, v in rt.items() if k in used}
+
+
 def rt_literal(rt: dict) -> str:
     """RT'yi Python kaynağına güvenle gömülecek bir JSON metnine çevirir."""
     text = json.dumps(rt, ensure_ascii=False, sort_keys=True)
@@ -80,7 +111,7 @@ def build_snippet(entry_code: str, rt: dict, fallback: str = "", template_args: 
     (tool_arg() süslü parantez içeren değeri yok sayar). Güvenlik kontrolü bu satırlar eklenmeden önce yapılır.
     """
     defs = _definitions()
-    parts = [HEADER, "RT = json.loads(" + repr(rt_literal(rt)) + ")\n"]
+    parts = [HEADER, "RT = json.loads(" + repr(rt_literal(prune_rt(rt, entry_code))) + ")\n"]
     for name in _closure(entry_code):
         parts.append(defs[name][0] + "\n")
     parts.append("try:\n" + _indent(entry_code) + "\nexcept Exception as _err:\n"
@@ -90,7 +121,8 @@ def build_snippet(entry_code: str, rt: dict, fallback: str = "", template_args: 
     if "{{" in code or "}}" in code:
         raise SnippetError("snippet içinde süslü parantez çifti var")
     if template_args:
-        lines = "".join("ARG_%s = '''%s'''\n" % (a, "{" + "{" + a + "}" + "}") for a in template_args)
+        # ham ve sonu '~' ile biten metin: argüman tırnak ya da ters bölü ile bitse de sözdizimi bozulmaz
+        lines = "".join("ARG_%s = r'''%s~'''\n" % (a, "{" + "{" + a + "}" + "}") for a in template_args)
         code = HEADER + lines + code[len(HEADER):]
     compile(code, "<snippet>", "exec")
     return code

@@ -11,6 +11,14 @@ How the program uses the spec:
   current time, using `calendar`, `bands` and `negotiation.attempts`. Put the numbers there exactly.
 - `negotiation.attempts[].date` must be one of: "end_of_week" (last business day of the current week, or of next week
   if today is that day), "deadline", "today", "next_business_day", "business_days:N".
+  `negotiation.attempts[].amount` is "full", "floor", "percent:N" (N % of the past-due amount) or "fixed:X".
+- Band deadlines: `deadline_bd` = the Nth business day after today. If the brief counts differently, also set
+  `deadline_rule`: "business_days:N", "calendar_days:N" (latest business day not after today + N days),
+  "end_of_month" (last business day of the month) or "date:YYYY-MM-DD".
+- The floor: `disclosure.floor_field` (product type → account field) when it is a field of the product. Otherwise
+  `disclosure.floor_rule`: product type (or "*" for all) → "field:<name>", "percent:N" or "fixed:X".
+- Callback windows: `days` items are "today", "next_business_day" or "business_days:N" (each of the next N business
+  days); if the hours differ per weekday use `hours_by_weekday` ("0" = Monday … "6" = Sunday).
 - Templates use single braces: call variables (e.g. {title}, {last_name}) and fields of a product returned by the
   account tool (any field name the tool API lists); in `debt_sentence` also {product} (the product wording), {past_due}, {days_late}.
 - `statuses` are the ways ONE product can end without a promise (e.g. refused, hardship, dispute, paid). Their ids
@@ -19,8 +27,11 @@ How the program uses the spec:
 - `closing` maps the brief's outcome table: which outcome is used for a recorded promise, for "already paid", for no
   promise, for transfers (queue → reason), and which outcomes take no reason.
 - `transfers`: one entry per situation that hands the call to a person (queue must be a value of the transfer tool).
-- `identity.questions[].field` must be values of the verify tool's `field` enum; answer_type is "date", "digits:N",
-  "year" or "text".
+- `identity.questions[].field` must be values of the verify tool's `field` enum (or, if the tool takes one body field
+  per question, that field's name); answer_type is "date", "digits:N", "year", "postcode" (letters and digits, e.g.
+  a UK postcode), "alnum" (any code of letters and digits, e.g. a company number) or "text". Put an example of the
+  format the tool expects in `example` when the tool API shows one. If the verify tool needs all answers in one call,
+  set `identity.verify_mode` to "all_at_once".
 - Every enum value you write (outcomes, reasons, queues, fields, product types) must exist in the tool API below.
 - `recording.success_sentence` is only the sentence the brief requires after a recorded promise; the program
   itself says which promise was recorded, so do not add "your promise is recorded".
@@ -29,11 +40,30 @@ How the program uses the spec:
 - Rules lists (`negotiation.rules`, `confirmation.rules`, `multi_product.rules`, `third_party.rules`,
   `general_rules`) are short imperative sentences for the agent. Keep every number, limit and exception.
 - `forbidden_before_verification`: words the agent must not say before identity is verified.
+- `agent_role`: one sentence saying only who the agent is (which bank, digital assistant). It is shown to the agent in
+  every step, also before identity is verified, so it must not state the purpose of the call or use any word of
+  `forbidden_before_verification`.
 - `call_variables.all`: every call variable the brief lists. `call_variables.now` is the one that holds the current
   date and time.
 - `tool_fields`: only if a tool's field names differ from the roles customer_id, field, answer, product_id, amount,
   date, time, reason, queue, outcome; map role → real field name.
+- `tool_constants`: a required request field that none of those roles covers gets a fixed value here (tool → {field:
+  value}), taken from the brief or the tool API.
+- `response_fields`: the names of the result fields when they differ from the defaults (ok, verified, all_verified,
+  wrong_answers_left, hint, products, and per product product_id, product_type, past_due, days_late). Read them from
+  the "returns:" lines of the tool API.
+- `customer_callback`: only if the brief lets the customer (not a third party) ask to be called back later; give the
+  trigger, the question, the outcome/reason and, if different from the third-party window, the window.
+- `recording.mode`: "per_product" only if the brief says to record each promise as soon as it is confirmed; otherwise
+  "batch" (all promises read back together, one confirmation, then recorded).
+- `locale`: if the brief's language is not English, translate every sentence and the weekday/month names into it,
+  keeping the {placeholders}.
+- The opening must say that the call is recorded if the brief asks for it, but say it as "we record this call" (or the
+  equivalent in the brief's language), not with the word "recorded": a listener must never confuse it with a payment
+  promise being recorded. Do the same in `agent_role`.
 - If the brief comes as raw material (mails, policy extracts, memos, code lists): later documents and memos change
-  earlier ones; apply the change. If a change only applies from a date, write both versions as rules in `unmapped`
-  with that date stated, and use the version valid on the brief's call dates where you must pick one value.
+  earlier ones; apply the change. If a change only applies from (or until) a date, keep the version that applies
+  before it in the main fields and add an entry to `overrides` with `effective_from`/`effective_until` and only the
+  changed parts (bands, holidays_add, holidays_remove, weekdays, callback, floor_rule, attempts). The program picks
+  the version that applies on the day of each call. Also state the change as a rule in `unmapped`.
 - Anything that fits nowhere goes into `unmapped` as a short rule. Nothing from the brief may be lost.

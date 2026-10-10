@@ -91,16 +91,111 @@ def test_prep_account_pub06_floor_attempts(ns, rt_a, public_cases):
 
 def test_validate_results(ns, rt_a, public_cases):
     vars, plans = _plans(ns, rt_a, public_cases["PUB-11"])
-    ok, msg = ns["validate_results"](vars, "p1:220:2026-10-16; p2:640:2026-10-16; p3:75:2026-10-16", rt_a)
-    assert ok, msg
+    state, msg, _ = ns["validate_results"](vars, "p1:220:2026-10-16; p2:640:2026-10-16; p3:75:2026-10-16", rt_a)
+    assert state == "confirm", msg
     assert len(json.loads(vars["rec_queue"])) == 3
+    assert vars["readback_say"].endswith("Do you confirm?") and "Friday 16 October" in vars["readback_say"]
     vars2, _ = _plans(ns, rt_a, public_cases["PUB-11"])
-    ok, msg = ns["validate_results"](vars2, "p1:220:2026-10-17", rt_a)  # Cumartesi + eksik ürünler
-    assert not ok and "business day" in msg
-    ok, msg = ns["validate_results"](vars2, "p1:10:2026-10-16; p2:refused; p3:refused", rt_a)
-    assert not ok and "floor" in msg
-    ok, msg = ns["validate_results"](vars2, "p1:66:2026-10-16; p2:refused; p3:dispute", rt_a)
-    assert ok, msg
+    state, msg, _ = ns["validate_results"](vars2, "p1:220:2026-10-17", rt_a)  # eksik ürünler: modelin hatası
+    assert state == "invalid" and "missing" in msg
+    state, msg, say = ns["validate_results"](vars2, "p1:10:2026-10-16; p2:refused; p3:refused", rt_a)
+    assert state == "invalid_say" and "cannot accept less than" in say
+    state, msg, _ = ns["validate_results"](vars2, "p1:66:2026-10-16; p2:refused; p3:dispute", rt_a)
+    assert state == "confirm", msg
+
+
+def test_validate_moves_weekend_and_deadline(ns, rt_a, public_cases):
+    """B kural 6 / A kural 20: kod düzeltir ve read-back'te söyler (PUB-13: ortak tarih kredinin deadline'ını aşıyor)."""
+    vars, plans = _plans(ns, rt_a, public_cases["PUB-13"])
+    late = [p for p in plans if p["band"] == "late"][0]
+    early = [p for p in plans if p["band"] == "early"][0]
+    text = "; ".join(f"{p['product_id']}:{p['past_due']}:2026-10-30" for p in plans)
+    state, msg, _ = ns["validate_results"](vars, text, rt_a)
+    assert state == "confirm", msg
+    queue = {p["product_id"]: p["date"] for p in json.loads(vars["rec_queue"])}
+    assert queue[late["product_id"]] == "2026-10-23" and queue[early["product_id"]] == "2026-10-30"
+    assert "latest date I can record" in vars["readback_say"] and "Friday 23 October" in vars["readback_say"]
+    vars, plans = _plans(ns, rt_a, public_cases["PUB-07"])
+    state, msg, _ = ns["validate_results"](vars, f"p1:{plans[0]['past_due']}:2026-10-26", rt_a)
+    assert json.loads(vars["rec_queue"])[0]["date"] == "2026-10-27"
+    assert "is not a business day" in vars["readback_say"]
+    state, msg, say = ns["validate_results"](vars, f"p1:{plans[0]['past_due']}:2026-10-01", rt_a)
+    assert state == "invalid_say" and "already passed" in say
+
+
+def test_identity_pieces_are_joined(ns, rt_a):
+    q4 = {"field": "phone", "ask": "x", "answer_type": "digits:4"}
+    qd = {"field": "dob", "ask": "y", "answer_type": "date"}
+    rt = dict(rt_a, identity={"questions": [qd, q4], "numeric_date_order": "DMY", "max_wrong_total": 3})
+    v = {}
+    ns["id_take_answer"](v, rt, "fourteenth of March", 0, "ask_q0")
+    assert v["id_go"] == "partial" and v["id_partial"]
+    ns["id_take_answer"](v, rt, "nineteen eighty-eight", 0, "ask_q0")
+    assert v["id_answer"] == "1988-03-14" and v["id_go"] == "ask_q0:0"
+    ns["id_take_answer"](v, rt, "four four", 1, "ask_q1")
+    assert v["id_go"] == "partial"
+    ns["id_take_answer"](v, rt, "seven one", 1, "ask_q1")
+    assert v["id_answer"] == "4471" and v["id_go"] == "ask_q1:1"
+    ns["id_take_answer"](v, rt, "double four seven one", 1, "reask")
+    assert v["id_answer"] == "4471" and v["id_go"] == "reask:1"
+
+
+def test_identity_answer_and_question_in_one_message(ns):
+    assert ns["normalize_answer"]("date", "twenty one July nineteen ninety. how much do I owe?") == ("1990-07-21", "ok")
+
+
+def test_swap_hint_month_only_answer(ns, rt_a):
+    qd = {"field": "dob", "ask": "y", "answer_type": "date"}
+    rt = dict(rt_a, identity={"questions": [qd], "numeric_date_order": "DMY", "max_wrong_total": 3})
+    v = {}
+    ns["id_take_answer"](v, rt, "04/03/1988", 0, "ask_q0")
+    assert v["id_answer"] == "1988-03-04"
+    ns["id_take_answer"](v, rt, "April", 0, "reask", True)
+    assert v["id_answer"] == "1988-04-03"
+
+
+@pytest.mark.parametrize("text,example,want", [
+    ("S W one A one A A", "SW1A 1AA", "SW1A 1AA"),
+    ("sierra whiskey one alpha one alpha alpha", "SW1A 1AA", "SW1A 1AA"),
+    ("my postcode is sw1a 1aa", "SW1A 1AA", "SW1A 1AA"),
+])
+def test_postcode(ns, text, example, want):
+    assert ns["normalize_answer"]("postcode", text, "DMY", example) == (want, "ok")
+
+
+def test_alnum_and_partial(ns):
+    assert ns["normalize_answer"]("alnum", "S C one two three four five six", "DMY", "SC123456") == ("SC123456", "ok")
+    assert ns["normalize_answer"]("postcode", "S W one A", "DMY", "SW1A 1AA")[1] == "partial"
+
+
+def test_floor_and_amount_rules(ns):
+    rt = {"floor_rule": {"*": "percent:10", "card": "fixed:50"}}
+    assert ns["floor_amount"]({}, "loan", 400.0, rt) == 40.0
+    assert ns["floor_amount"]({}, "card", 400.0, rt) == 50.0
+    assert ns["attempt_amount"]("percent:50", 40.0, 400.0) == 200.0
+    assert ns["attempt_amount"]("floor", 0.0, 400.0) == 400.0
+
+
+def test_deadline_rules(ns, rt_a):
+    cal = rt_a["cal"]
+    today = D(2026, 10, 14)
+    assert ns["deadline_for"]({"deadline_rule": "calendar_days:10", "deadline_bd": 0}, today, cal) == D(2026, 10, 23)
+    assert ns["deadline_for"]({"deadline_rule": "end_of_month", "deadline_bd": 0}, today, cal) == D(2026, 10, 30)
+    assert ns["deadline_for"]({"deadline_rule": "", "deadline_bd": 7}, today, cal) == D(2026, 10, 23)
+
+
+def test_overrides_by_date(ns, rt_a):
+    rt = dict(rt_a, overrides=[{"effective_from": "2026-11-01", "holidays_add": ["2026-11-02"],
+                                "bands": [{"name": "all", "min": 1, "max": 99, "deadline_bd": 3, "attempts": 1}]}])
+    assert ns["effective_rt"](rt, D(2026, 10, 14))["bands"] == rt_a["bands"]
+    later = ns["effective_rt"](rt, D(2026, 11, 3))
+    assert later["bands"][0]["name"] == "all" and "2026-11-02" in later["cal"]["holidays"]
+
+
+def test_callback_today_only_on_business_day(ns, rt_a):
+    v = {"now": "2026-10-17T11:00"}  # Cumartesi
+    ns["prep_callback"](v, rt_a)
+    assert v["cb_days"] == "2026-10-19"
 
 
 def test_callback_window(ns, rt_a):
@@ -118,7 +213,8 @@ def test_callback_window(ns, rt_a):
     ({"promises_ok": "1"}, ("promise", "")),
     ({"promises_ok": "1", "transfer_queue": "restructuring"}, ("transferred", "restructuring")),
     ({"transfer_queue": "general"}, ("transferred", "human")),
-    ({"close_outcome": "not_reached", "close_reason": "callback"}, ("not_reached", "callback")),
+    ({"close_fixed_outcome": "not_reached", "close_fixed_reason": "callback"}, ("not_reached", "callback")),
+    ({"transfer_ok_support": "true"}, ("transferred", "support")),
     ({"statuses_json": json.dumps([{"product_id": "p1", "reason": "paid"}])}, ("paid", "")),
     ({"statuses_json": json.dumps([{"product_id": "p1", "reason": "paid"},
                                    {"product_id": "p2", "reason": "dispute"}])}, ("no_promise", "dispute")),

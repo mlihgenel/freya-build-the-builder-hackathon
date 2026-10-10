@@ -33,8 +33,12 @@ def _code_strings(node: dict) -> list[str]:
     return out
 
 
-def lint(workflow: dict, cat: ToolCatalog, *, call_vars: list[str], forbidden_pre_verify: list[str]) -> list[str]:
+def lint(workflow: dict, cat: ToolCatalog, *, call_vars: list[str], forbidden_pre_verify: list[str],
+         warnings: list[str] | None = None) -> list[str]:
+    """Hata listesi döner (build bunlarda durur). `warnings` verilirse deploy'u durdurmayan bulgular oraya yazılır:
+    gizli bir openapi'de beklenmeyen zorunlu alan agent'ı hiç kurmamaktan iyidir."""
     errs: list[str] = []
+    warns = warnings if warnings is not None else []
     nodes = workflow.get("nodes", {})
     if workflow.get("initial_node") not in nodes:
         errs.append("initial_node yok")
@@ -110,13 +114,14 @@ def lint(workflow: dict, cat: ToolCatalog, *, call_vars: list[str], forbidden_pr
     blob = json.dumps(workflow)
     produced |= set(re.findall(r"vars\[\\?[\"']([\w.]+)\\?[\"']\]\s*=", blob))
     produced |= set(re.findall(r'"variable": "([\w.]+)"', blob))
+    prefixes = set(re.findall(r"vars\[\\?[\"']([\w.]+)\\?[\"']\s*\+", blob))
     for name, n in nodes.items():
         texts = [n.get("task_message", ""), json.dumps(n.get("on_enter", {}))]
         for fn in n.get("pre_actions", []):
             texts.append(json.dumps(fn.get("function", {}).get("parameters", {}).get("properties", {}).get("body", {})))
         for txt in texts:
             for v in VAR.findall(txt):
-                if v not in produced and not v.startswith(SYSTEM_PREFIXES):
+                if v not in produced and not v.startswith(SYSTEM_PREFIXES) and not v.startswith(tuple(prefixes)):
                     errs.append(f"{name}: {{{{{v}}}}} hiçbir yerde üretilmiyor")
 
     # doğrulamadan önceki sabit cümlelerde yasaklı kelime
@@ -126,6 +131,12 @@ def lint(workflow: dict, cat: ToolCatalog, *, call_vars: list[str], forbidden_pr
         for w in forbidden_pre_verify:
             if re.search(r"\b" + re.escape(w.lower()) + r"\b", spoken):
                 errs.append(f"{name}: açılış cümlesi yasaklı kelime içeriyor: {w}")
+        system = ((workflow.get("system_prompt") or "").splitlines() or [""])[0].lower()  # agent_role satırı
+        for w in forbidden_pre_verify:
+            if re.search(r"\b" + re.escape(w.lower()) + r"\b", system):
+                warns.append(f"system prompt doğrulama öncesi yasaklı kelime içeriyor: {w} (agent_role?)")
+        if re.search(r"\brecorded\b", spoken):
+            warns.append(f"{name}: açılışta 'recorded' kelimesi var (hakem bunu promise kaydı sanabilir)")
 
     # bankaya giden alanlar openapi'de var mı
     for name, n in list(nodes.items()) + [("tools", {"pre_actions": workflow.get("tools", [])})]:
@@ -143,7 +154,7 @@ def lint(workflow: dict, cat: ToolCatalog, *, call_vars: list[str], forbidden_pr
                     errs.append(f"{name}: {tool.name}.{field} openapi'de yok")
             for req in (r for r, fd in tool.fields.items() if fd.required):
                 if req not in body:
-                    errs.append(f"{name}: {tool.name} zorunlu alanı eksik: {req}")
+                    warns.append(f"{name}: {tool.name} zorunlu alanı eksik: {req} (spec.tool_constants ile doldurulabilir)")
     size = len(json.dumps(workflow))
     if size > 400_000:
         errs.append(f"workflow çok büyük: {size} bayt")

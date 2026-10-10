@@ -1,7 +1,7 @@
 {
   "language": "English",
   "bank_name": "Freya Bank",
-  "agent_role": "You are Freya Bank's digital assistant, calling customers on a recorded line.",
+  "agent_role": "You are Freya Bank's digital assistant, calling customers on a line that we record.",
   "call_variables": {
     "customer_id": "customer_id",
     "now": "now",
@@ -9,7 +9,7 @@
     "all": ["customer_id", "first_name", "last_name", "title", "now"]
   },
   "opening": {
-    "first_sentence": "Hello, this is the digital assistant calling from Freya Bank. This call is recorded.",
+    "first_sentence": "Hello, this is the digital assistant calling from Freya Bank. Please note that we record this call.",
     "confirm_question": "Am I speaking with {title} {last_name}?",
     "accepted_confirmations": ["yes", "that's me", "speaking", "the customer's own name"],
     "not_confirmations": ["hello", "go ahead", "who is this"],

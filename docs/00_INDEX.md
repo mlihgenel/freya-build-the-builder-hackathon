@@ -13,7 +13,9 @@ Freya × YC "Build the Builder" (10–11 Ekim 2026) builder'ının dokümanları
 8. `08_KARARLAR_VE_ACIK_SORULAR.md`: kararlar ve organizatöre sorular
 9. `09_TESLIM.md`: teslim adımları
 10. `10_TEST_REHBERI.md`: **ekip için** kurulum, test komutları, sonuç okuma, düzeltme döngüsü
-11. `BUGFIX_LOG.md`: gizli brief'ler açıldıktan sonraki değişiklikler
+11. `11_REVIEW.md`: review ve madde madde uygulama durumu
+12. `12_RAPOR.md`: review düzeltmeleri ve ölçüm raporu (10 Ekim)
+13. `BUGFIX_LOG.md`: gizli brief'ler açıldıktan sonraki değişiklikler
 
 ## Hızlı komutlar
 ```bash
@@ -34,14 +36,16 @@ uv run fbb chat brief-a "Hello?" --case PUB-01                                  
 | `src/fbb/build.py`, `cli.py`, `trace.py`, `kitapi.py` | 03, 09 |
 | `tests/` | 06 |
 
-## Durum (10 Ekim 2026, ~17:45 TR)
-- Builder uçtan uca çalışıyor: Claude spec çıkarımı → workflow → Freya'ya kayıt ve yayın → export → trace.
-- Freya deneyleri F-01, F-03…F-06 ve F-08 olumlu (`02`).
-- Brief A ilk simülasyon: **10/10**.
-- Brief B: 0/3. Sebep Freya'nın kod servisi (snekbox) kesintisi. Kesinti koruması eklendi, kayıt zinciri kısaltıldı, "yarın" tarih hatası düzeltildi.
-- Bekleyen:
-  - kod servisinin düzelmesi (organizatöre bildirildi)
-  - A ve B'nin `--reps 3` ölçümü
-  - konuşma stilleri
-  - varyant provası ve G-01
+## Durum (10 Ekim 2026, ~20:35 TR)
+- `11_REVIEW.md`'deki düzeltmeler uygulandı (madde madde durum: `11_REVIEW.md` §F). Özet:
+  - close_call: kapanış node'larında + müşteri kapatırsa lifecycle yedeği; erken outcome yazımı; retries 2.
+  - Read-back/onay kodda (`propose_results` → `readback`); geçersiz teklif tts ile söylenir.
+  - Kimlik: soru başına sabit node, sonuç kodsuz route; parçalı cevap birleştirme; ret sayacı; 500'de "eşleşmiyor" denmez.
+  - Openapi esnekliği: `response_fields`, `tool_constants`, soru başına gövde alanı / all_at_once, postcode/alnum; lint çökmez.
+  - Spec genişletme: deadline/floor/tutar/callback kuralları, tarihli `overrides`, `customer_callback`, `recording.mode`, `locale`; LLM gevşek modu.
+- `uv run pytest`: 83 test yeşil; ruff temiz. Workflow ≈300 KB, 43 node.
+- Freya'ya kuruldu (`mert-a`, `mert-b`): dryRun + kayıt + geri okuma 0 fark. Chat smoke: açılış, parçalı DOB, hata yolu doğru.
+- **Ölçüm (VPN ile):** A **9/10** pass³, B **3/3** pass³, en yavaş tur medyanı 1–2 sn. F-09 ✅. Mock bazı TR ağlarından erişilemiyor (VPN gerekli).
+- Stiller (tek tekrar): in_words A 9/10, B 3/3; pieces A 9/10, B 2/3. asks_back/corrects/talkative son düzeltmelerden sonra ölçülmedi.
+- Açık: PUB-06 ve PUB-12 ikna sayımı (model; kalıcı çözüm adayı: denemeleri koda taşımak), varyant provası (simülasyonla).
 - Sonuç tablosu ve test komutları: `10_TEST_REHBERI.md` §9.

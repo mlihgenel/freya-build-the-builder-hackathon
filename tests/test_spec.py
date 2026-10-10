@@ -50,6 +50,6 @@ def test_overlapping_bands_rejected():
 
 def test_runtime_matches_hand_rt():
     rt = to_runtime(load("spec_a.json"))
-    for key in ("cal", "bands", "floor_field", "product_wording", "attempts", "callback", "status_reasons"):
+    for key in ("cal", "bands", "floor_rule", "product_wording", "attempts", "callback", "status_reasons"):
         assert rt[key] == RT_A[key], key
     assert rt["closing"]["transfer_reasons"] == RT_A["closing"]["transfer_reasons"]

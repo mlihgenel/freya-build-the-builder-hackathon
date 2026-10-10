@@ -9,7 +9,10 @@
 | K-03 | Builder LLM'i Claude Opus 5.5, claude-agent-sdk ile | Uzun ve ham brief'leri iyi okuyor; structured output; makinedeki giriş | OpenAI |
 | K-04 | Model sadece 3 code_exec tool'u çağırır; bankaya yazmaları engine yapar | Sabit model zayıf: susma, olumsuz sonucu görmezden gelme, gereksiz not | modelin bankayı doğrudan çağırması |
 | K-05 | Tarihler çağrı sırasında `now`'dan code node'unda hesaplanır | Platform tarihleri gerçek saati kullanıyor; testler birden fazla günde | prompt'ta tarih hesabı |
-| K-06 | `close_call` lifecycle (end_of_call) + durumdan hesaplanan pre-hook | Her zaman son çağrı ve tam bir kez; telefon kapansa bile çalışıyor | her yolda node içinde close |
+| K-06 | `close_call` normal yolda kapanış node'unda (hook'suz); ayrıca lifecycle (end_of_call) yedeği: pre-hook `close_r_ok` varsa isteği iptal eder (URL boş), yoksa gövdeyi durumdan kurar | 10 Eki: lifecycle pre-hook'u kod servisi kesintisinde düştü (normal yol hook'suz olmalı); müşteri kapatınca da close_call gitmeli (review B.1) | sadece lifecycle; sadece node |
+| K-09 | Read-back ve onay kodda: model `propose_results` çağırır, kod düzeltir ve cümleyi üretir, `readback` node'u tts ile okur, routing evet/hayır'a göre ilerler | PUB-13/PUB-10/PUB-07 hataları; dürüstlük (review B.2–3) | modelin read-back yapması |
+| K-10 | Kimlik sonucu cevap alanlarıyla doğrudan route; mutsuz yollar tek `id_fix` + `reask` | Gecikme ve workflow boyutu (9 varyant node'u 514 KB yapıyordu) | soru başına varyant node'ları |
+| K-11 | Kayıt döngüsü code node'lu kalır (≤3 ürün için açılmış sabit zincir yapılmadı) | Review C.3: sadece ölçüm >10 sn gösterirse; ölçüm henüz yok | sabit api zinciri |
 | K-07 | Gizli brief'te simülasyon yok; lint + dryRun + geri okuma + chat smoke | Bilinen vaka yok; eşitlikte build süresi sayılıyor | uzun self-test |
 | K-08 | Model talimatları İngilizce, müşteriye söylenen sabit cümleler brief'ten birebir | Agent modeli için en güvenlisi | |
 

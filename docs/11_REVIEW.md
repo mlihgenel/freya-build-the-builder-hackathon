@@ -146,3 +146,46 @@ Her adım: `uv run pytest` + ruff → `--spec` ile kur → `fbb cases --only` �
 - L1: `build-agent … --spec tests/fixtures/spec_ab.json --no-deploy`. Ayrıca varyant openapi ile no-deploy, crash olmamalı.
 - L4: `fbb cases <slot> --brief A --reps 3` ve `--brief B --reps 3`. Ardından her stil için `--style X` (en azından `pieces`, `in_words`, `asks_back`). Hedef: medyan en yavaş tur <10 sn, A ≥9/10 ve B 3/3 pass^3.
 - Sonuçlar `docs/10` §9 tablosuna, platform dersleri `docs/02`'ye yazılır.
+
+---
+
+## F. Uygulama durumu (10 Ekim, ~20:35 TR)
+
+Her madde kodda, birim testte ve (mümkünse) platformda. "Ölçüm bekliyor" = `fbb cases` için mock'a erişim gerekiyor (bu makineden `*.workers.dev` erişilemiyor).
+
+| # | Durum | Ne yapıldı | Nerede / test |
+|---|---|---|---|
+| 1 | ✅ kod, ölçüm bekliyor | close_call kapanış node'larında (hook'suz, retries 2) + üst seviye lifecycle yedeği. Pre-hook: `close_r_ok` doluysa URL boşaltılır (istek gitmez), değilse gövde `decide_close` ile kurulur (reason kuralı dahil). URL boşaltma çalışmasa bile ikinci çağrı birincinin aynısı. Erken outcome: üçüncü kişi → no_callback, hesap hazırlanınca → hangup_verified, her kayıttan sonra güncel durum. Platformda pre-hook'un saklandığı doğrulandı | `graph.py` (backup), `closing.lifecycle_close`, `test_lifecycle_close_backup`, `test_third_party_sets_early_outcome` |
+| 2 | ✅ | `negotiate_fix` llm on_enter'ı sadece biçim hatası ve read-back reddi için (müşteriye kayıt hakkında bir şey söylememe talimatıyla). Müşteriye söylenecek ret cümlesi kodla üretilip `negotiate_fix_say` tts ile söyleniyor | `validate.adjust_promise`, `test_invalid_proposal_is_said_by_tts` |
+| 3 | ✅ | `propose_results` → kod doğrular ve düzeltir (deadline'a çekme, iş gününe kaydırma, borçtan fazla tutarı borca indirme) → read-back cümlesi (ürün, tutar, hafta günüyle tarih, düzeltme notu, onay sorusu) → `readback` node'u tts → routing: evet → kayıt, hayır/değişiklik → `readback_reset` → müzakere. Model artık read-back yapmıyor ve müşterinin söylediği tarihi olduğu gibi veriyor | `validate.py`, `flow.propose_results`, `test_readback_*`, `test_validate_moves_weekend_and_deadline` |
+| 4 | ✅ (kayıt zinciri hariç) | `identity_check` ve `id_result` kaldırıldı; soru başına sabit node, sonuç cevap alanlarıyla route; mutsuz yollar tek `id_fix` + `reask`. Sabit kapanışlar ve transferler kodsuz. "One moment, please." tts: ilk verify, fetch_account, ilk kayıt. Kayıt zinciri açılmadı (C.3: ölçüm >10 sn gösterirse) | `graph.py`, `test_identity_happy_path_has_no_code_nodes`; chat'te submit exec 0,2–0,7 sn |
+| 5 | ✅ | `id_partial` birleştirme (rakam ve tarih parçaları), yılsız/günsüz tarih = partial, "cevap + soru" aynı mesajda (sondaki noktalama) okunuyor; ipucundan sonra sadece ay söylenirse gün önceki cevaptan | `normalize.combine_answer/date_parts`, `test_identity_pieces_are_joined`, `test_swap_hint_month_only_answer`; chat'te doğrulandı |
+| 6 | ✅ kod, A/B ölçümü bekliyor | Çıkarım prompt'u: açılış "we record this call" biçiminde, "recorded" kelimesi yok (agent_role dahil); altın spec'ler güncellendi; lint açılışta "recorded" görürse uyarır | `prompts/extract.md`, `lint.py`, fixture'lar |
+| 7 | ✅ | `spec.response_fields` + `resolve_response_fields` (openapi cevap şemasından en yakın alan) + `cross_check`; LLM özetine "returns:" satırları eklendi | `test_variant_openapi_does_not_crash` |
+| 8 | ✅ | verify alanları aynı yapıyla (`ok/verified/all_verified/wrong_answers_left/hint`) | aynı test |
+| 9 | ✅ | Soru başına ayrı gövde alanı ve `verify_mode=all_at_once`; `postcode`/`alnum` normalizasyonu (harf harf, NATO alfabesi, "double"), `example`'a göre boşluk | `test_per_question_body_fields`, `test_postcode`, `test_alnum_and_partial` |
+| 10 | ✅ | Eksik zorunlu alan lint uyarısı; `spec.tool_constants`; openapi `default` ve tek değerli enum otomatik dolduruluyor | `graph.body_for`, varyant testi |
+| 11 | ✅ | `deadline_rule`, `floor_rule`, `attempts.amount` (percent/fixed), `callback.days` (`business_days:N`) ve `hours_by_weekday`; `llm.lenient_validate`: son çare olarak desteklenmeyen değeri atar/çevirir ve `unmapped`'e yazar | `test_floor_and_amount_rules`, `test_deadline_rules` |
+| 12 | ✅ | `spec.overrides` (`effective_from/until`), runtime `effective_rt` (`prep_account`, `prep_callback`, doğrulama, callback kontrolü) | `test_overrides_by_date` |
+| 13 | ✅ | `spec.customer_callback` (tetikleyici, soru, outcome, pencere, aşama); `cust_cb*` node'ları opener/kimlik/negotiate'ten | `test_customer_callback` |
+| 14 | ✅ | `recording.mode=per_product`: her onaydan sonra kayıt, `negotiate_more` ile sıradaki ürün; notlar en sonda (transferde not yok kuralı korunur); duyurulmuş kayıtlar kapanışta tekrarlanmaz | `test_per_product_mode` |
+| 15 | ✅ (sayı kelimeleri hariç) | `opening.max_asks`, `identity.decline_close_after` (kodda sayaç), not tekrar sayısı `recording.retries`; gün/ay adları ve kodun ürettiği bütün cümleler `spec.locale`'de. İngilizce dışı sayı kelimeleri okunmuyor (G-04) | `test_opener_uses_max_asks` |
+| 16 | ✅ | verify 500 → "could not check" (yanlış denmez), verify retries 1; close_call retries 2; transfer/callback/not retries 1; callback hatasında `close_no_callback`; `ok` alanı yoksa zarfın `status`'u | `test_identity_wrong_swap_and_service_error`, varyant testi |
+| 17 | ✅ | Code node guard'ı → `fallback_close[_nr]` (baked `{{close_outcome}}` ile close_call); sabit kapanışlar ve transferler kodsuz | `test_every_code_node_has_failure_guard`, `test_static_closes_have_no_code` |
+| 18 | ✅ | `ARG_x = r'''{{x}}~'''`: tırnak/ters bölüyle biten argüman sözdizimini bozmaz (içinde üç tek tırnak geçmesi hâlâ risk) | `test_model_argument_with_quotes_does_not_break_snippet` |
+| 19 | ✅ | `today` sadece iş günüyse | `test_callback_today_only_on_business_day` |
+| 20 | ✅ | "double"/"triple" | `test_identity_pieces_are_joined` |
+| 21 | ⚠️ bilinçli karar | `rec_amount` kodda sayı olarak yazılıyor ve `{{rec_amount:json}}` ile gidiyor; pre-hook ile tip çevirme eklenmedi (her kayıtta +1 code exec ve kod servisine bağımlılık). Kullanılmayan `coerce_body` kaldırıldı. Bir sonraki koşuda `fbb call` ile gövdedeki tip kontrol edilecek | `flow.rec_pick` |
+| 22 | ✅ | Snippet'ler yorumsuz/docstring'siz (`ast.unparse`), RT sadece kullanılan anahtarlarla gömülü; kimlik varyantları tek `reask`'te. 43 node ≈300 KB (önce 322 KB), test sınırı 340 KB | `emit.prune_rt/_compact`, `test_workflow_lints_clean` |
+| 23 | ✅ | 00, 02, 03, 04, 05, 06, 07, 08, 10 güncellendi | |
+| 24 | 🟡 | Sayım hâlâ modelde. PUB-12 0/3–1/3 düştü (ürün başına 'bugün' tekrar soruldu, late bandında 2. deneme atlandı) → negotiate görevine genel ikna kuralları; sonra B 3/3 pass³. A'da PUB-06 1/3 benzer bir sapma (1. deneme atlandı) | `texts.negotiate_task` |
+
+**Ölçüm (VPN ile, 20:41–20:56):** A 9/10 pass³ (önce 3/10), B 3/3 pass³ (önce 2/3); en yavaş tur medyanı 1–2 sn. Ayrıntı `10_TEST_REHBERI.md` §9. Ölçüm sırasında bir bug bulundu ve düzeltildi: `id_take_answer` `id_q`'yu yazmıyordu (yanlış 2. cevaptan sonra 1. soru soruluyordu).
+
+**Açık deneyler:** F-09 ✅ (mock'a doğrudan, bkz. 02). F-11: lifecycle yedeğinin URL boşaltmayla iptal edildiği platformda görüldü (`Missing required field: url`, ledger'da tek close_call). F-10 kısmen ✅ (belirteçle route ve hata dalı chat'te çalıştı). F-07 ölçülmedi.
+
+**Doğrulama:** L0 ✅ (`pytest` 83 test, ruff temiz). L1 ✅ (`make local-a local-b`, varyant openapi birim testinde). L2 ✅ (`mert-a`, `mert-b`: dryRun, kayıt, 0 fark, export). L3 kısmen (elle değişkenlerle chat). L4 ⏳.
+
+**Ek bulgu (20:36, LLM çıkarımı ile L1):** Brief A tam build (`--no-deploy`, 2 dk 18 sn, $1.82) geçerli spec üretti: 0 uyumsuzluk, lint temiz, açılış "We record this call.". Ama `agent_role` aramanın amacını içeriyordu ("state the debt, get a payment promise") ve bu satır system prompt'la her adımda, doğrulamadan önce de modele gidiyor. Düzeltme: çıkarım prompt'una `agent_role` kuralı, lint'e "system prompt'un ilk satırında doğrulama öncesi yasaklı kelime" uyarısı.
+
+**Stil koşuları (21:08–22:53):** Bulunan ve düzeltilen bizden kaynaklı hatalar (hepsine test): rakam rakam söylenen yıl; iki/üç parça yıl ("19"+"88"); eksik cevapta sistemin eksik kısmı sabit cümleyle sorması (`id_fix` → `reask`, model artık beklemiyor); ret açıklamasından sonra doğru sorunun tekrar sorulması. Model davranışı için genel prompt kuralları: parçalı tutar/tarih, ret sayısına göre açık deneme senaryosu (`product_facts`), teklifin tekrar edilmemesi. Son durum: in_words A 9/10, B 3/3; pieces A 9/10, B 2/3. Açık: PUB-06 (floor ikinci kez söyleniyor, 2/3) ve PUB-12 (ikna sayımı) model kaynaklı ve tekrarlıyor; asks_back/corrects/talkative düzeltmelerden sonra yeniden ölçülmedi. Kalıcı çözüm adayı: ikna denemelerini koda taşımak (modelin `product_refused(pid)` çağırdığı, deneme cümlesini kodun ürettiği bir adım).

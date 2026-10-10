@@ -21,6 +21,18 @@
 | `closing` | outcome eşlemesi, kuyruk → reason, reason almayan outcome'lar, telefon kapanınca yedek outcome, veda | `decide_close`, `apply_close_body` |
 | `money` | para birimi ön ek/son ek | `fmt_money` |
 | `tool_fields` | openapi alan adları rol adlarından farklıysa eşleme | `graph.field_map` |
+| `tool_constants` | rollere uymayan zorunlu istek alanlarına sabit değer (ör. para birimi) | `graph.body_for` |
+| `response_fields` | cevap alanı adları (ok, verified, all_verified, wrong_answers_left, hint, products, product_id, product_type, past_due, days_late) | verify/fetch mapping'leri, `facts.field_name` |
+| `overrides[]` | tarihli memo değişiklikleri: bands, holidays_add/remove, weekdays, callback, floor_rule, attempts | `dates.effective_rt` |
+| `customer_callback` | müşterinin kendisi sonra aranmak isterse: tetikleyici, soru, outcome, pencere, aşamalar | `cust_cb*` node'ları |
+| `recording.mode` | `batch` (tek onay, sonra kayıt) ya da `per_product` (her ürün onaylanınca kayıt) | `next_step`, `negotiate_more` |
+| `locale` | kodun ürettiği cümleler (read-back, "one moment", düzeltme notları) ve gün/ay adları | `say`, `spoken_date` |
+| `identity.verify_mode`, `questions[].example` | `each` / `all_at_once`; cevap biçimi örneği (postcode boşluğu) | verify node'ları, `normalize_answer` |
+| `bands[].deadline_rule`, `disclosure.floor_rule`, `attempts[].amount`, `callback.days`/`hours_by_weekday` | genişletilmiş kurallar (aşağıda) | `deadline_for`, `floor_amount`, `attempt_amount`, `callback_days` |
+
+**Kural biçimleri:** `deadline_rule`: `business_days:N` · `calendar_days:N` · `end_of_month` · `date:YYYY-MM-DD` (boşsa `deadline_bd`). `floor_rule`: tip (ya da `*`) → `field:<alan>` · `percent:N` · `fixed:X`. `attempts[].amount`: `full` · `floor` · `percent:N` · `fixed:X`. `callback.days`: `today` (sadece iş günüyse) · `next_business_day` · `business_days:N`. `answer_type`: `date` · `digits:N` · `year` · `postcode` · `alnum` · `text`.
+
+LLM çıktısı şemaya uymazsa iki kez düzeltme istenir; sonra `llm.lenient_validate` desteklenmeyen değeri atar (varsayılan kullanılır) ya da desteklenen ilk değere çevirir ve notu `unmapped`'e yazar. Build bu yüzden çökmez.
 | `general_rules`, `unmapped` | her yerde geçerli kurallar, yerleştirilemeyenler | `negotiate` görevi |
 
 ## Brief A → spec eşlemesi (kural numaraları)
@@ -34,12 +46,12 @@
 | 11–15 kimlik | `identity.*` (DMY, `max_wrong_total` 3, `swap_hint` `day_month_swapped`, ret açıklaması, 2 ret → declined) |
 | 16–17 borcun söylenmesi | `disclosure.*` |
 | 18 bantlar, iş günleri, tatiller | `bands`, `calendar` |
-| 19–23 tarih kuralları | `negotiation.rules` + kod (`check_promise`, `day_table`) |
-| 24–27 tutar ve floor | `disclosure.floor_field`, `negotiation.rules`, `check_promise` |
+| 19–23 tarih kuralları | `negotiation.rules` + kod (`adjust_promise`, `day_table`) |
+| 24–27 tutar ve floor | `disclosure.floor_field`/`floor_rule`, `negotiation.rules`, `adjust_promise` |
 | 28–31 ikna denemeleri | `negotiation.first_ask_single`, `negotiation.attempts` |
 | 32 hardship | `transfers[support]`, `statuses[hardship]`, kural |
 | 33 yasak teklifler | `negotiation.forbidden_offers` |
-| 34–36 onay ve read-back | `confirmation.*` |
+| 34–36 onay ve read-back | `confirmation.*` + kod (`readback_text`, `readback` node'u) |
 | 37–38 kayıt, hata, SMS cümlesi | `recording.*` + engine kayıt döngüsü |
 | 39 paid, 40 dispute | `statuses[paid]`, `statuses[dispute]` |
 | 41 restructuring, 42 insan | `transfers[restructuring]`, `transfers[human]` (`ask_first`) |

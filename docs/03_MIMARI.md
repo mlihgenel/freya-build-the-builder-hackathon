@@ -19,8 +19,9 @@ Telefon agent'ının modeli sabit (`experimental-5`) ve zayıf. Bu yüzden ona k
 | 3. Claude: brief → `PolicySpec` (JSON şeması ile structured output) | `ingest/extract.py`, `llm.py` | ~1 dk |
 | 4. Claude: denetim, cümle cümle karşılaştırıp düzeltilmiş spec | `ingest/extract.py` | ~1–1.5 dk |
 | 5. `cross_check`: spec'teki enum'lar openapi'de var mı | `spec.py` | anlık |
-| 6. Spec → workflow (35 node, snippet'ler gömülü) | `workflow/graph.py` | anlık |
-| 7. Lint: null, tools/pre_actions yeri, passthrough `always`, end'e ulaşma, değişken üretimi, alanlar | `workflow/lint.py` | anlık |
+| 5b. `resolve_response_fields`: cevap alanı adlarını openapi'ye göre düzelt | `spec.py` | anlık |
+| 6. Spec → workflow (~43 node, ~300 KB; snippet'ler yorumsuz, RT sadece kullanılan anahtarlarla gömülü) | `workflow/graph.py` | anlık |
+| 7. Lint: null, tools/pre_actions yeri, passthrough `always`, end'e ulaşma, değişken üretimi, alanlar (eksik zorunlu alan ve açılışta 'recorded' = uyarı) | `workflow/lint.py` | anlık |
 | 8. Freya `dryRun` → `save_workflow(slot)` (oluştur/güncelle + publish) | `kitapi.py` | ~5–20 sn |
 | 9. Geri oku: platformun sessizce sildiği alan var mı | `build._diff_stored` | ~2 sn |
 | 10. `export_workflow` → `exports/<slot>.workflow.json` | `kitapi.py` | ~2 sn |
@@ -34,7 +35,7 @@ Telefon agent'ının modeli sabit (`experimental-5`) ve zayıf. Bu yüzden ona k
 |---|---|
 | `config.py` | yollar, `env.sh`/`.env` yükleme, builder modeli, trace'ten silinecek gizli değerler |
 | `trace.py` | `traces/<slot>-<zaman>.jsonl` + `.txt`. `model_call(model, purpose, seconds, cost)`, `event(...)`. Redaction |
-| `llm.py` | `ask_json(system, prompt, PydanticModel, purpose, trace)`: claude-agent-sdk, araç yok, `output_format=json_schema`. Doğrulama hatasında 2 kez daha sorar |
+| `llm.py` | `ask_json(system, prompt, PydanticModel, purpose, trace)`: claude-agent-sdk, araç yok, `output_format=json_schema`. Doğrulama hatasında 2 kez daha sorar, sonra gevşek moda düşer (`lenient_validate`) |
 | `ingest/openapi.py` | `ToolCatalog.url/enum/summary_text` |
 | `ingest/extract.py` + `prompts/` | çıkarım ve denetim prompt'ları (genel; brief içeriği yok) |
 | `spec.py` | `PolicySpec` (pydantic, `extra=forbid`), `cross_check`, `to_runtime` (spec → `RT`) |
@@ -52,7 +53,9 @@ Telefon agent'ının modeli sabit (`experimental-5`) ve zayıf. Bu yüzden ona k
 - İki brief toplam ≤ 15 dk. Kalan süre yeniden çalıştırma ve teslim için.
 - Self-test gizli brief'te yapılmaz (bilinen vaka yok, eşitlikte build süresi sayılıyor). Bunun yerine lint + dryRun + geri okuma + kısa chat smoke yapılır.
 
-## Bilinen boşluklar (yapılacak)
-- **G-01:** Cevap alanları (`data.ok`, `data.verified`, `data.all_verified`, `data.wrong_answers_left`, `data.hint`, `data.products`, ürün alanları `product_id/type/past_due/days_late`) şu an rol adlarıyla aynı kabul ediliyor. Gizli openapi'de değişirse spec'e `response_fields` eşlemesi eklenecek (openapi cevap şemasından doğrulanarak).
-- **G-02:** Memo'ların yürürlük tarihi (`effective_from`) şu an sadece `unmapped` kuralı olarak prompt'a giriyor.
+## Bilinen boşluklar
+- **G-01 (kapandı, 10 Eki):** cevap alanları `spec.response_fields`'ta. LLM openapi'nin "returns:" satırlarından doldurur; `resolve_response_fields` alan openapi'de yoksa en yakın alanı seçer ve trace'e yazar; `cross_check` ürün alanlarını denetler. Yazma çağrılarında `ok` alanı yoksa zarfın `status`'u (`success`) kullanılır.
+- **G-02 (kapandı, 10 Eki):** tarihli memo değişiklikleri `spec.overrides` (`effective_from`/`effective_until`); runtime `effective_rt` ile o günün değerlerini seçer.
 - **G-03:** Consensus (2 çıkarım + karşılaştırma) henüz yok. Determinizm için düşünülecek.
+- **G-04:** Sayı kelimelerinin okunması (`normalize.py`) sadece İngilizce. Kodun ürettiği cümleler ve gün/ay adları `spec.locale`'den gelir.
+- Build çökmez: LLM çıktısı iki düzeltme denemesinden sonra da geçersizse `llm.lenient_validate` desteklenmeyen değerleri atar ve `unmapped`'e yazar; openapi'de beklenmeyen zorunlu alan lint uyarısıdır (`tool_constants` ya da openapi `default`/tek enum ile doldurulur).

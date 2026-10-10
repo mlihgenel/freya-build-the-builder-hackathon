@@ -66,11 +66,15 @@ Kaynak: `kit/docs/workflow-format.md`, `tools-and-code.md`, `api.md` (kit v3). F
 | F-05 | Passthrough code ↔ api_request döngüsü (kayıt kuyruğu) sorunsuz mu? | `rec_pick` ↔ `record_promise` | ✅ rec_pick → record_promise → rec_after → rec_pick → note_pick → close_final zinciri tek turda çalıştı (≈3 sn) |
 | F-06 | tts içinde çok değişkenli ve çok satırlı metin doğru okunuyor mu? | `{{id_say}}`, `{{debt_statement}}`, `{{closing_speech}}` | ✅ `{{debt_statement}} {{first_ask}}` ve `{{closing_speech}}` doğru okundu |
 | F-07 | Bir simülasyon ve bir chat ne kadar kredi harcıyor? ($100 workspace kredisi) | test bütçesi | ⏳ |
-| F-08 | ~235 KB'lık workflow (snippet'ler gömülü) kaydediliyor mu? | boyut | ✅ 35 node, ≈235 KB workflow; dryRun + kayıt + geri okuma: 0 fark, lifecycle tool korunmuş |
+| F-08 | ~235 KB'lık workflow (snippet'ler gömülü) kaydediliyor mu? | boyut | ✅ 35 node, ≈235 KB workflow; dryRun + kayıt + geri okuma: 0 fark, lifecycle tool korunmuş. 10 Eki 20:30: 43 node ≈300 KB (A) ve ≈305 KB (A+B) de 0 farkla kaydedildi |
+| F-09 | Normal kapanıştan sonra lifecycle close_call çalışırsa ledger ne olur? | kapanış yedeği | ✅ (10 Eki, mock'a doğrudan): ikinci close_call `ok:false, "the call is already closed"` döner; ledger'daki outcome/reason ilk çağrınınki kalır; `calls[-1]` yine close_call. Yani yedek normal yolda iptal edilemese de zararsız. Ayrıca `reason: ""` gönderilen close_call reddedilir (`this outcome needs one of these reasons`) → boş reason asla gönderilmemeli (tasarım göndermiyor) |
+| F-10 | api_request mapping değişkenleriyle doğrudan route güvenilir mi? | kimlik route'u | ✅ kısmen (10 Eki 20:31 chat): `id_go=ask_q0:0` belirteci aynı turda `verify_q0`'a götürdü; HTTP hatasında mapping boş kaldı ve passthrough varsayılanı (`id_fix`) çalıştı. `"true"` başarı dalı gerçek bir müşteriyle henüz denenmedi |
+| F-11 | api_request `on_enter` tts + passthrough sırasında müşteri konuşursa? | "One moment" cümleleri | ⏳ Kit belgesi passthrough node'da kısa tts'i öneriyor. Chat'te tts söylendi ve akış devam etti; araya konuşma denenmedi |
 
 Yedek planlar `08_KARARLAR_VE_ACIK_SORULAR.md` dosyasında.
 
 ## Ölçümler (10 Ekim)
+- 20:31 chat (yeni graf): `submit_answer` code exec 0,2–0,7 sn; kimlik cevabından sonraki tur ≈1 sn (eskiden 2 code node).
 - Node gecikmesi: code node 0.2–1.1 sn, api_request 0.1–0.4 sn. Müşteri onayı → veda cümlesi ≈ 4 sn (kayıt + not + kapanış zinciri).
 - `/chat/message` uzun bir passthrough zincirinde **502** dönebilir, ama çağrı arka planda tamamlanıyor. Chat smoke'ta 502 hata sayılmaz; `get_call` ile sonuca bakılır.
 - PUB-01 uçtan uca (chat): ledger beklenenle birebir aynı (promise p1 420 2026-10-14, outcome promise, reason null, son çağrı close_call).

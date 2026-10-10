@@ -67,11 +67,3 @@ def model_tool(name: str, description: str, params: dict[str, str], entry: str, 
         },
     }
 
-
-STRIP_HEADER = (
-    "try:\n"
-    "    if isinstance(result, dict):\n"
-    "        result.pop('header', None)\n"
-    "except Exception:\n"
-    "    pass\n"
-)

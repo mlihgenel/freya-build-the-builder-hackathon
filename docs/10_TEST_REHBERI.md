@@ -204,6 +204,8 @@ staging-app.freyavoice.ai → çağrı kayıtları. Simülasyon çağrıları "S
 
 | Sorun | Ne yapılır |
 |---|---|
+| **Mock'a erişilemiyor** (`freya-bank-mock.freyavoice.workers.dev:443` bağlantı reddi; 10 Eki 20:20, bazı TR ağlarında `*.workers.dev` engelli). `fbb cases`, `fbb chat --case` ve `score.py` çalışmaz | VPN ya da başka bir ağ. Freya'nın kendisi mock'a erişiyor; sadece bizim pratik oturumu açmamız ve ledger okumamız engelli |
+| `FREYA_SIM_CONCURRENCY` yükseltmek | 10'da koşu 3–4 kat hızlandı ama agent turları 30 sn'ye kadar yavaşladı (müşteri kapatma riski, ölçüm bozulur). Varsayılan 5'te kal |
 | **Kod servisi (snekbox) kesintisi.** Freya staging'de code node'ları ve hook'lar çalışmıyor: `Failed to reach snekbox …` (10 Eki ~17:20 TR'den beri) | Agent kilitlenmez; korumalı olarak sabit vedayla kapanır, ama iş yapamaz. Organizatöre bildirildi. Servis düzelince bir chat smoke ile kontrol et, sonra simülasyon çalıştır |
 | Chat 502 | Uzun kayıt zincirinde normal; `fbb call` ile sonuca bak |
 | "the phone agent was slow" uyarısı | Model o an yoğun. Aynı agent başka bir turda hızlıysa skor düşük ölçülmüştür, tekrar çalıştır |
@@ -219,11 +221,29 @@ staging-app.freyavoice.ai → çağrı kayıtları. Simülasyon çağrıları "S
 | 17:19 | dev-b (v1) | Brief B, 3 vaka × 1 | 0/3 | kod servisi kesintisi → kayıt döngüsü kilitlendi. Konuşmalar doğruydu; bir "yarın" tarih hatası bulundu |
 | 17:28 | dev-b (v2) | Brief B, 3 vaka × 1 | 0/3 | kod servisi tamamen kapalı; koruma çağrıyı temiz kapattı |
 | 17:45 | dev-b (v3) | Brief B, 3 vaka × 1 | **3/3** | kod servisi düzelmişti. Risk: PUB-11'de her ürün ayrı onaylandı (brief tek ortak onay istiyor); prompt'ta düzeltildi (v4) |
+| 18:12 | mert-a (HEAD 8c400d6) | PUB-09 × 1 | 1/1 | |
+| 20:30 | mert-a, mert-b (review düzeltmeleri) | L2: dryRun + kayıt + geri okuma | 0 fark | 43 node, ≈300/305 KB; lifecycle pre-hook korunmuş |
+| 20:36 | mert-a-llm | Brief A, LLM çıkarımı, `--no-deploy` | spec geçerli, lint 0 | 2 dk 18 sn, $1.82; `agent_role` amacı içeriyordu → prompt + lint uyarısı |
+| 20:41 | mert-a (review) | Brief A, `--reps 3` | **9/10 pass³** (29/30) | en yavaş tur medyanı 2 sn (önce 12–24), kapatma 0. PUB-05 2/3: destek ekibi iki kez teklif edildi |
+| 20:45 | mert-b (review) | Brief B, `--reps 3` | 2/3 | PUB-12 0/3: yanlış telefondan sonra DOB soruldu → `id_q` yazılmıyordu (bug, düzeltildi + test) |
+| 20:49 | mert-b (id_q düzeltmesi) | Brief B, `--reps 3` | 2/3 | PUB-12 1/3: kimlik doğru; ikna sayımı: ürün başına "bugün" tekrar soruldu / late bandında 2. deneme atlandı → negotiate'e genel ikna kuralları |
+| 20:53 | mert-b (ikna kuralları) | Brief B, `--reps 3` | **3/3 pass³** | |
+| 20:56 | mert-a (ikna kuralları) | Brief A, `--reps 3` | **9/10 pass³** | PUB-05 3/3; PUB-06 2/3: floor önce "bugün" için teklif edildi, 1. deneme atlandı (tek düşüş, prompt değişmedi). Bir koşuda en yavaş tur 15,9 sn |
+| 21:08–21:47 | mert-b (A+B spec, 13 vaka) | 5 stil × 1 | pieces 8/13, in_words 6/13, asks_back 10/13, corrects 10/13, talkative 9/13 | Ölçüm hatası: A vakaları notları açık agent'ta koşuldu (PUB-05/08 add_note düşüşleri geçersiz). Gerçek hatalar: rakam rakam yıl okunmuyordu ve eksik cevapta agent bekliyordu ("one moment" döngüsü), iki parça yıl birleşmiyordu, 2. soruda ret açıklamasından sonra DOB soruluyordu → düzeltildi + test |
+| 22:01 | mert-a / mert-b | in_words A / B | **9/10**, **3/3** | A: PUB-06 (floor iki kez teklif) |
+| 22:11 | mert-a | pieces A | 8/10 | PUB-01: "19"+"88"+"1988" → 2095 okundu (bug, düzeltildi + test); PUB-06 |
+| 22:18 | mert-b | pieces B (iki koşu) | 1/3, 2/3 | PUB-13: "30." ve "Twenty" ilk parçaları kullanıldı (model) → parça kuralı güçlendirildi; PUB-12 ikna sayımı |
+| 22:25 | mert-a / mert-b (paralellik 10) | pieces A / B | **9/10**, 2/3 | PUB-01 ve PUB-13 düzeldi. Paralellik 10'da bir turda 30 sn sessizlik → koşularda varsayılan 5 kullanılmalı |
+| 22:30 | mert-a (tekrar teklif kuralı) | PUB-06 pieces × 3 | 2/3 | floor tekrar teklifi azaldı, bitmedi |
+| 22:53 | mert-b | PUB-12 pieces × 3 | — | Freya 503 "API key validation is temporarily unavailable"; koşmadı |
+| 20:31 | mert-a | chat smoke (elle değişkenler, sahte customer_id) | akış doğru | parçalı DOB birleşti; HTTP hatasında `id_fix → reask` "could not check" dedi; submit exec 0,2–0,7 sn |
 
-Bu sonuçlardan sonra yapılan düzeltmeler:
+17:45 koşusundan sonra yapılan düzeltmeler:
 - kayıt zinciri 6 adımdan 2'ye indi
 - her code node'una kesinti koruması eklendi
 - kod zaman sınırı 30 sn'ye çıktı
 - "yarın" tarih kuralı eklendi
 
-Sıradaki ölçüm: A (v4) ve B (v4) `--reps 3`, ardından konuşma stilleri.
+20:30 sürümündeki düzeltmeler (review): bkz. `11_REVIEW.md` §F.
+
+Sıradaki ölçüm (mock erişimi gerekli): `fbb cases mert-a --brief A --reps 3`, `fbb cases mert-b --brief B --reps 3`, ardından `--style pieces|in_words|asks_back|corrects|talkative`. Hedef: medyan en yavaş tur < 10 sn, A ≥ 9/10 ve B 3/3 pass^3.
