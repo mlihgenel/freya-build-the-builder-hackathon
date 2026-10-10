@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.8",
     "claude-agent-sdk>=0.1",
+    "certifi>=2026.7.22",
 ]
 
 [dependency-groups]

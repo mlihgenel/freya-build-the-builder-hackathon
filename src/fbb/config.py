@@ -17,7 +17,17 @@ SELFTEST_STOP_S = 20 * 60
 
 
 def load_env() -> None:
-    """env.sh / .env içindeki `export AD=değer` satırlarını os.environ'a yükler (zaten varsa dokunmaz)."""
+    """env.sh / .env içindeki `export AD=değer` satırlarını os.environ'a yükler (zaten varsa dokunmaz).
+
+    Ayrıca HTTPS için certifi sertifikalarını gösterir: python.org Python'u macOS'ta sistem sertifikalarını
+    görmez ve kitin urllib çağrıları CERTIFICATE_VERIFY_FAILED verir. Alt süreçler (run_cases) de bunu miras alır.
+    """
+    try:
+        import certifi
+
+        os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    except ImportError:
+        pass
     for name in ("env.sh", ".env"):
         path = ROOT / name
         if not path.exists():
@@ -27,7 +37,8 @@ def load_env() -> None:
             if not m:
                 continue
             val = m.group(2).split(" #", 1)[0].strip().strip('"').strip("'")
-            os.environ.setdefault(m.group(1), val)
+            if val or not os.environ.get(m.group(1)):
+                os.environ[m.group(1)] = val if val else os.environ.get(m.group(1), "")
 
 
 def builder_model() -> str:
