@@ -191,6 +191,8 @@ def negotiate_task(spec: PolicySpec) -> str:
         "  Example: p1:250.50:2026-10-16; p2:refused",
         f'- Do NOT read the promises back and do NOT ask "{c.confirm_question}" yourself: after propose_results the '
         "system reads every promise back (product, amount, date) and asks for the confirmation.",
+        "- Call propose_results without speaking first: the system speaks next (read-back or goodbye). Never say a "
+        "sentence a second time in the call (sympathy, an explanation, an apology).",
         "- Never say that anything is recorded or saved: the system says it after the bank confirms. Do not say "
         "goodbye: the system closes the call.",
         "Last check result: {{commit_msg}}",

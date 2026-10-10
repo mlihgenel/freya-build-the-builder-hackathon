@@ -245,6 +245,12 @@ staging-app.freyavoice.ai → çağrı kayıtları. Simülasyon çağrıları "S
 | 00:00 | dev-b (v3) | Brief B × 3 | 2/3 | PUB-13: "ikisi de 30 Ekim" → kredi 16 Ekim'e kaydedildi (gerileme) → `agreed_all` |
 | 00:10 | dev-b (v4, agreed_all) | Brief B × 3 | **3/3 pass³** | |
 | 00:15 | dev-a (v4) | Brief A × 3 | **10/10 pass³** | en yavaş tur medyanı 2–3 sn |
+| 00:40 | dev-a-llm / dev-b-llm | Claude ile tam build (A, A+B) + `specdiff` | lint 0; PUAN farkı A 0, B 1 | B: `hangup_unverified` farkı (brief tanımlamıyor) |
+| 00:42 | dev-a-llm | Brief A × 3 | 9/10 | PUB-05 2/3: `propose_results` öncesi teselli tekrarı → texts kuralı |
+| 00:52 | dev-b-llm | Brief B × 3 | **3/3 pass³** | |
+| 01:00 | rep-a2, rep-a3 | A çıkarımı ×2 (`--no-deploy`) + `specdiff` | PUAN farkı 0 | tekrar üretilebilirlik |
+| 01:20 | dev-a-llm (v2) | Brief A × 3 | **10/10 pass³** | |
+| 01:35 | dev-b-llm (v2) | Brief B × 3 | **3/3 pass³** | |
 
 17:45 koşusundan sonra yapılan düzeltmeler:
 - kayıt zinciri 6 adımdan 2'ye indi

@@ -15,6 +15,7 @@
 | F4 | Brief B | 13/13 bir kez, `--reps 3` ile ≥ 11/13 | ✅ public 3 vaka `--reps 3` 3/3 pass³ (11 Eki 00:10) |
 | F6 | varyant provası (C/D/E), G-01 cevap alanı eşlemesi | çökme yok, ≥ %80 | 🟡 G-01 ✅, varyant openapi birim testi ✅ (`test_variant_openapi_does_not_crash`); ham materyal provası C (LLM, `--no-deploy`) ✅ lint 0; simülasyon provası yok |
 | F7 | stiller + 3 tekrar | bilinmeyen sebeple 3/3 altında vaka yok | ⏳ next_offer sürümüyle stiller ölçülmedi; LLM tam build (floor_note çıkarımı) da denenmedi |
+| F5b | LLM spec'iyle uçtan uca (finaldeki zincir) | A ≥ 9/10, B 3/3 pass³; çıkarımlar arası puan farkı yok | ✅ A 10/10, B 3/3; 3 çıkarım 0 fark (11 Eki 01:45) |
 | F8 | teslim provası: temiz kopyadan 2 brief art arda | tek komut, brief başına ≤ 10 dk | |
 | — | **Özellik dondurma: Pazar 18:00 TR** | | |
 
