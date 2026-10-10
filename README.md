@@ -60,4 +60,4 @@ uv run fbb cases <agent_id> --brief A --reps 3     # kitin run_cases.py'si (Frey
 | `src/fbb/build.py` | pipeline |
 | `docs/` | tasarım, kurallar, runbook (Türkçe) |
 
-Kurallar ve tasarım için `docs/00_INDEX.md`'den başlayın.
+Kurallar ve tasarım için `docs/00_INDEX.md`'den başlayın. **Test etmek için: `docs/10_TEST_REHBERI.md`.**

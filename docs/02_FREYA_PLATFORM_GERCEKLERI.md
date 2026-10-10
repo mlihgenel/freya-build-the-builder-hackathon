@@ -59,13 +59,18 @@ Kaynak: `kit/docs/workflow-format.md`, `tools-and-code.md`, `api.md` (kit v3). F
 
 | F | Soru | Tasarımdaki yeri | Sonuç |
 |---|---|---|---|
-| F-01 | Lifecycle `close_call` pre-hook'u `vars`'ı görüyor mu? | close_call pre-hook | ⏳ |
+| F-01 | Lifecycle `close_call` pre-hook'u `vars`'ı görüyor mu? | close_call pre-hook | ✅ (10 Eki) PUB-01 chat'inde close_call gövdesi `{outcome: promise, customer_id}` ile gitti; `reason` silinmişti; ledger `reason: null` |
 | F-02 | Müşteri telefonu kapatınca `end_of_call` çalışıyor mu? | kapanış | ⏳ |
-| F-03 | Model-çağrılı `code_exec` tool'unun argümanları nereye düşüyor (`ARG_x` şablonu / `vars['x']` / `<tool>_args.x`)? | `submit_answer`, `submit_results`, `propose_callback` | ⏳ |
-| F-04 | Bir code_exec tool'unun yazdığı `vars` aynı turda route'u tetikliyor mu? | `id_ready`, `commit`, `cb_state` route'ları | ⏳ |
-| F-05 | Passthrough code ↔ api_request döngüsü (kayıt kuyruğu) sorunsuz mu? | `rec_pick` ↔ `record_promise` | ⏳ |
-| F-06 | tts içinde çok değişkenli ve çok satırlı metin doğru okunuyor mu? | `{{id_say}}`, `{{debt_statement}}`, `{{closing_speech}}` | ⏳ |
+| F-03 | Model-çağrılı `code_exec` tool'unun argümanları nereye düşüyor (`ARG_x` şablonu / `vars['x']` / `<tool>_args.x`)? | `submit_answer`, `submit_results`, `propose_callback` | ✅ `code` alanındaki `{{results}}` şablonu modelin argümanıyla dolduruluyor (`ARG_results = 'p1:420:2026-10-14'`). Argüman ayrıca `args.params.results` içinde görünüyor |
+| F-04 | Bir code_exec tool'unun yazdığı `vars` aynı turda route'u tetikliyor mu? | `id_ready`, `commit`, `cb_state` route'ları | ✅ submit_answer/submit_results sonrası `id_ready`/`commit` route'ları aynı turda tetiklendi |
+| F-05 | Passthrough code ↔ api_request döngüsü (kayıt kuyruğu) sorunsuz mu? | `rec_pick` ↔ `record_promise` | ✅ rec_pick → record_promise → rec_after → rec_pick → note_pick → close_final zinciri tek turda çalıştı (≈3 sn) |
+| F-06 | tts içinde çok değişkenli ve çok satırlı metin doğru okunuyor mu? | `{{id_say}}`, `{{debt_statement}}`, `{{closing_speech}}` | ✅ `{{debt_statement}} {{first_ask}}` ve `{{closing_speech}}` doğru okundu |
 | F-07 | Bir simülasyon ve bir chat ne kadar kredi harcıyor? ($100 workspace kredisi) | test bütçesi | ⏳ |
-| F-08 | ~235 KB'lık workflow (snippet'ler gömülü) kaydediliyor mu? | boyut | ⏳ |
+| F-08 | ~235 KB'lık workflow (snippet'ler gömülü) kaydediliyor mu? | boyut | ✅ 35 node, ≈235 KB workflow; dryRun + kayıt + geri okuma: 0 fark, lifecycle tool korunmuş |
 
 Yedek planlar `08_KARARLAR_VE_ACIK_SORULAR.md` dosyasında.
+
+## Ölçümler (10 Ekim)
+- Node gecikmesi: code node 0.2–1.1 sn, api_request 0.1–0.4 sn. Müşteri onayı → veda cümlesi ≈ 4 sn (kayıt + not + kapanış zinciri).
+- `/chat/message` uzun bir passthrough zincirinde **502** dönebilir, ama çağrı arka planda tamamlanıyor. Chat smoke'ta 502 hata sayılmaz; `get_call` ile sonuca bakılır.
+- PUB-01 uçtan uca (chat): ledger beklenenle birebir aynı (promise p1 420 2026-10-14, outcome promise, reason null, son çağrı close_call).

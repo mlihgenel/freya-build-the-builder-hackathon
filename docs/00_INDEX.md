@@ -12,7 +12,8 @@ Freya × YC "Build the Builder" (10–11 Ekim 2026) builder'ının dokümanları
 7. `07_RUNBOOK_FINAL.md`: saat planı ve final penceresi
 8. `08_KARARLAR_VE_ACIK_SORULAR.md`: kararlar ve organizatöre sorular
 9. `09_TESLIM.md`: teslim adımları
-10. `BUGFIX_LOG.md`: gizli brief'ler açıldıktan sonraki değişiklikler
+10. `10_TEST_REHBERI.md`: **ekip için** kurulum, test komutları, sonuç okuma, düzeltme döngüsü
+11. `BUGFIX_LOG.md`: gizli brief'ler açıldıktan sonraki değişiklikler
 
 ## Hızlı komutlar
 ```bash
@@ -33,6 +34,14 @@ uv run fbb chat brief-a "Hello?" --case PUB-01                                  
 | `src/fbb/build.py`, `cli.py`, `trace.py`, `kitapi.py` | 03, 09 |
 | `tests/` | 06 |
 
-## Durum (10 Ekim 2026, 17:00 TR)
-- Yapıldı: iskelet, runtime + testler, spec + openapi, graf + lint, LLM çıkarımı (Brief A: 2 dk, ~$1, altın spec'e çok yakın), trace, build/export CLI. 47 test yeşil.
-- Bekleyen: Freya key'leri. Ardından Faz 0 deneyleri (F-01…F-07), Brief A/B simülasyonları, varyant provası.
+## Durum (10 Ekim 2026, ~17:45 TR)
+- Builder uçtan uca çalışıyor: Claude spec çıkarımı → workflow → Freya'ya kayıt ve yayın → export → trace.
+- Freya deneyleri F-01, F-03…F-06 ve F-08 olumlu (`02`).
+- Brief A ilk simülasyon: **10/10**.
+- Brief B: 0/3. Sebep Freya'nın kod servisi (snekbox) kesintisi. Kesinti koruması eklendi, kayıt zinciri kısaltıldı, "yarın" tarih hatası düzeltildi.
+- Bekleyen:
+  - kod servisinin düzelmesi (organizatöre bildirildi)
+  - A ve B'nin `--reps 3` ölçümü
+  - konuşma stilleri
+  - varyant provası ve G-01
+- Sonuç tablosu ve test komutları: `10_TEST_REHBERI.md` §9.

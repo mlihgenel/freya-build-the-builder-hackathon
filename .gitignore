@@ -22,3 +22,7 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 .DS_Store
+
+# geliştirme sırasında üretilen trace/export'lar (teslim edilecekler final-* adıyla üretilir)
+traces/dev-*
+exports/dev-*
