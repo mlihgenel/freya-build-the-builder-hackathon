@@ -52,13 +52,13 @@ def model_tool(name: str, description: str, params: dict[str, str], entry: str, 
     snippet = build_snippet(entry, rt, template_args=list(params))
     props = {
         "code": {"type": "string", "default": snippet},
-        "timeout_ms": {"type": "number", "default": 10000},
+        "timeout_ms": {"type": "number", "default": 30000},
     }
     for p, desc in params.items():
         props[p] = {"type": "string", "description": desc}
     return {
         "type": "function",
-        "config": {"timeoutMs": 12000},
+        "config": {"timeoutMs": 35000},
         "function": {
             "name": name,
             "handler": "__function__:code_exec",

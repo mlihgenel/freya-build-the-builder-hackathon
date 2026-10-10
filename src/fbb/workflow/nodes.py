@@ -15,6 +15,11 @@ def when_eq(target: str, desc: str, variable: str, *values: str) -> dict:
         {"variable": variable, "operator": "equals", "operand": v} for v in values]}}
 
 
+def when_gt(target: str, desc: str, variable: str, value: int) -> dict:
+    return {"target_node": target, "description": desc, "condition": {"logic": "or", "conditions": [
+        {"variable": variable, "operator": "greater_than", "operand": value}]}}
+
+
 def tool_transition(target: str, desc: str) -> dict:
     """Model bu transition'ı `transition_to_<target>` tool'u olarak görür ve çağırarak tetikler."""
     return {"target_node": target, "description": desc, "is_tool_call": True,
@@ -43,7 +48,12 @@ def conversation(name: str, task: str, *, on_enter: dict | None = None, tools: l
     return node
 
 
-def code(name: str, snippet: str, transitions: list, default_target: str, timeout_ms: int = 10000) -> dict:
+def code(name: str, snippet: str, transitions: list, default_target: str, timeout_ms: int = 30000,
+         guard: str = "") -> dict:
+    """Code node. `guard`: kod servisi bu node'u çalıştıramazsa (platformun `<node>_failure_count` sayacı)
+    gidilecek node. Yoksa değişkenler güncellenmez ve döngüler sonsuza kadar döner (10 Ekim'de görüldü)."""
+    if guard:
+        transitions = [when_gt(guard, f"code service failed in {name}", f"{name}_failure_count", 0)] + transitions
     return {
         "name": name,
         "node_type": "code",

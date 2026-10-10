@@ -244,3 +244,44 @@ def coerce_body(config, types):
                 body[key] = int(float(val))
         except Exception:
             pass
+
+
+def next_step(vars, RT):
+    """Kayıt/not döngüsünün tek adımı: sıradaki işi seç; iş kalmadıysa kapanışı hazırla.
+
+    Dönüşte vars['next_step']: 'record' | 'note' | 'end'. Her code node'u yük altında birkaç saniye sürdüğü için
+    seçim, sonuç işleme ve kapanış tek node'da yapılır."""
+    rec_pick(vars, RT)
+    if vars.get("rec_state") == "go":
+        vars["next_step"] = "record"
+        return
+    note_pick(vars, RT)
+    if vars.get("note_state") == "go":
+        vars["next_step"] = "note"
+        return
+    set_close(vars, RT, "", "", "")
+    vars["next_step"] = "end"
+
+
+def take_results_and_start(vars, RT, raw):
+    """submit_results: doğrula; geçerliyse ilk kaydı hemen hazırla (ayrı bir code node'u beklemeden)."""
+    take_results(vars, RT, raw)
+    if vars.get("commit") == "ready":
+        next_step(vars, RT)
+
+
+def after_record_step(vars, RT):
+    rec_after(vars, RT)
+    next_step(vars, RT)
+
+
+def after_note_step(vars, RT):
+    note_after(vars, RT)
+    next_step(vars, RT)
+
+
+def transfer_and_close(vars, RT, queue, say):
+    """Transferden önce kapanışı hazırla: çağrı transferden hemen sonra biter."""
+    vars["transfer_queue"] = queue
+    vars["rec_queue"] = "[]"
+    set_close(vars, RT, "", "", say)

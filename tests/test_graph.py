@@ -84,6 +84,11 @@ def test_three_wrong_answers_fail(cat):
     assert v["id_state"] == "failed"
 
 
+def _commit(n, v, results):
+    v["submit_results_args.results"] = results
+    run_snippet(_tool_code(n["negotiate"], "submit_results"), vars=v)
+
+
 def test_record_loop_with_failure(cat, public_cases):
     """PUB-10: ilk create_promise başarısız, ikincisi başarılı → tek promise, outcome promise."""
     wf = build_workflow(spec("spec_a.json"), cat)
@@ -92,29 +97,36 @@ def test_record_loop_with_failure(cat, public_cases):
     v = {"now": "2026-10-14T11:00", "products": products}
     run_snippet(_code_of(n["prep_account"]), vars=v)
     plan = json.loads(v["plans_json"])[0]
-    v["submit_results_args.results"] = f"p1:{plan['past_due']}:2026-10-16"
-    run_snippet(_tool_code(n["negotiate"], "submit_results"), vars=v)
-    assert v["commit"] == "ready", v.get("commit_msg")
-    run_snippet(_code_of(n["rec_pick"]), vars=v)
-    assert v["rec_state"] == "go"
+    _commit(n, v, f"p1:{plan['past_due']}:2026-10-16")
+    assert v["commit"] == "ready" and v["next_step"] == "record", v.get("commit_msg")
     v["rec_r_ok"] = ""  # 500: mapping boş kalır
-    run_snippet(_code_of(n["rec_after"]), vars=v)
-    run_snippet(_code_of(n["rec_pick"]), vars=v)
-    assert v["rec_state"] == "go"
+    run_snippet(_code_of(n["rec_step"]), vars=v)
+    assert v["next_step"] == "record"  # bir kez daha denenir
     v["rec_r_ok"] = "true"
-    run_snippet(_code_of(n["rec_after"]), vars=v)
-    run_snippet(_code_of(n["rec_pick"]), vars=v)
-    assert v["rec_state"] == "done" and v["promises_ok"] == "1"
-    run_snippet(_code_of(n["note_pick"]), vars=v)
-    assert v["note_state"] == "done"
-    run_snippet(_code_of(n["close_final"]), vars=v)
+    run_snippet(_code_of(n["rec_step"]), vars=v)
+    assert v["next_step"] == "end" and v["promises_ok"] == "1"
     assert v["close_outcome"] == "promise" and v["close_reason"] == ""
     assert "text message" in v["closing_speech"] and "recorded" in v["closing_speech"]
-    # close_call pre-hook: reason gönderilmez
     pre = wf["tools"][0]["pre_process_code"]
     config = {"body": {"customer_id": "c1", "outcome": "promise", "reason": ""}}
     run_snippet(pre, vars=v, config=config)
     assert config["body"] == {"customer_id": "c1", "outcome": "promise"}
+
+
+def test_record_fails_twice_service_error(cat, public_cases):
+    wf = build_workflow(spec("spec_a.json"), cat)
+    n = wf["nodes"]
+    products = [dict(p, product_id="p%d" % (i + 1)) for i, p in enumerate(public_cases["PUB-10"]["products"])]
+    v = {"now": "2026-10-14T11:00", "products": products}
+    run_snippet(_code_of(n["prep_account"]), vars=v)
+    plan = json.loads(v["plans_json"])[0]
+    _commit(n, v, f"p1:{plan['past_due']}:2026-10-16")
+    for _ in range(2):
+        v["rec_r_ok"] = ""
+        run_snippet(_code_of(n["rec_step"]), vars=v)
+    assert v["next_step"] == "end"
+    assert (v["close_outcome"], v["close_reason"]) == ("no_promise", "service_error")
+    assert "could not record" in v["closing_speech"]
 
 
 def test_multi_product_notes(cat, public_cases):
@@ -125,32 +137,25 @@ def test_multi_product_notes(cat, public_cases):
     v = {"now": "2026-10-14T11:00", "products": products}
     run_snippet(_code_of(n["prep_account"]), vars=v)
     plans = json.loads(v["plans_json"])
-    v["submit_results_args.results"] = f"p1:{plans[0]['past_due']}:2026-10-15; p2:refused; p3:refused"
-    run_snippet(_tool_code(n["negotiate"], "submit_results"), vars=v)
-    assert v["commit"] == "ready", v.get("commit_msg")
-    run_snippet(_code_of(n["rec_pick"]), vars=v)
+    _commit(n, v, f"p1:{plans[0]['past_due']}:2026-10-15; p2:refused; p3:refused")
+    assert v["next_step"] == "record", v.get("commit_msg")
     v["rec_r_ok"] = "true"
-    run_snippet(_code_of(n["rec_after"]), vars=v)
-    run_snippet(_code_of(n["rec_pick"]), vars=v)
+    run_snippet(_code_of(n["rec_step"]), vars=v)
     notes = []
-    for _ in range(5):
-        run_snippet(_code_of(n["note_pick"]), vars=v)
-        if v["note_state"] != "go":
-            break
+    while v["next_step"] == "note":
         notes.append((v["note_pid"], v["note_reason"]))
         v["note_r_ok"] = "true"
-        run_snippet(_code_of(n["note_after"]), vars=v)
+        run_snippet(_code_of(n["note_step"]), vars=v)
     assert notes == [("p2", "refused"), ("p3", "refused")]
-    run_snippet(_code_of(n["close_final"]), vars=v)
-    assert v["close_outcome"] == "promise"
+    assert v["next_step"] == "end" and v["close_outcome"] == "promise"
 
 
-def test_coerce_hook_makes_amount_number(cat):
-    wf = build_workflow(spec("spec_a.json"), cat)
-    rec = wf["nodes"]["record_promise"]["pre_actions"][0]
-    config = {"body": {"customer_id": "c1", "product_id": "p1", "amount": "637.5", "date": "2026-10-16"}}
-    run_snippet(rec["pre_process_code"], vars={}, config=config)
-    assert config["body"]["amount"] == 637.5
+def test_transfer_prepares_close(cat):
+    wf = build_workflow(spec("spec_ab.json"), cat)
+    v = {"title": "Mr", "last_name": "X"}
+    run_snippet(_code_of(wf["nodes"]["transfer_restructuring"]), vars=v)
+    assert (v["close_outcome"], v["close_reason"]) == ("transferred", "restructuring")
+    assert wf["nodes"]["do_transfer"]["transitions"][-1]["target_node"] == "end_main"
 
 
 def test_closing_speech_fills_call_variables(cat):
@@ -159,3 +164,14 @@ def test_closing_speech_fills_call_variables(cat):
     run_snippet(_code_of(wf["nodes"]["close_id_failed"]), vars=v)
     assert v["closing_speech"].endswith("Ms Almeida. Goodbye.") and "{" not in v["closing_speech"]
     assert v["close_outcome"] == "not_verified" and v["close_reason"] == "failed"
+
+
+def test_every_code_node_has_failure_guard(cat):
+    """Kod servisi çalışmazsa değişkenler güncellenmez; koruma olmazsa döngü sonsuza kadar döner (10 Ekim)."""
+    wf = build_workflow(spec("spec_ab.json"), cat)
+    for name, node in wf["nodes"].items():
+        if node["node_type"] == "code":
+            first = node["transitions"][0]
+            assert first["target_node"] == "end_fallback", name
+            assert first["condition"]["conditions"][0]["variable"] == f"{name}_failure_count", name
+    assert "{{" not in wf["nodes"]["end_fallback"]["terminal"]["function"]["parameters"]["properties"]["spoken_message"]["default"].replace("{{title}}", "").replace("{{last_name}}", "")

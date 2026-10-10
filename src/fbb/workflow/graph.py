@@ -13,20 +13,18 @@ from fbb.ingest.openapi import ToolCatalog
 from fbb.runtime.emit import build_snippet
 from fbb.spec import PolicySpec, to_runtime
 from fbb.workflow import texts
-from fbb.workflow.nodes import api_request, code, conversation, end_call, tool_transition, when_eq
+from fbb.workflow.nodes import api_request, conversation, end_call, tool_transition, when_eq
+from fbb.workflow.nodes import code as _code
 from fbb.workflow.tools import bank_call, model_tool
 
 END = "end_main"
+FALLBACK_END = "end_fallback"
 
 
-def _types(cat: ToolCatalog, tool: str, optional: list[str] | None = None) -> dict:
-    t = {k: f.type for k, f in cat.tools[tool].fields.items() if f.type in ("number", "integer")}
-    t["optional"] = optional or []
-    return t
-
-
-def _coerce_hook(cat: ToolCatalog, tool: str, rt: dict, optional: list[str] | None = None) -> str:
-    return build_snippet(f"coerce_body(config, {_types(cat, tool, optional)!r})", rt)
+def code(*args, **kw) -> dict:
+    """Her code node'u kod servisi hatasına karşı korumalı: hata olursa sabit vedayla biten node'a gider."""
+    kw.setdefault("guard", FALLBACK_END)
+    return _code(*args, **kw)
 
 
 def field_map(spec: PolicySpec, cat: ToolCatalog, tool: str, values: dict[str, str]) -> dict[str, str]:
@@ -121,10 +119,13 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
         "CALL it once at the end, when every product has a confirmed promise or a final status. Format: "
         "<product_id>:<amount>:<YYYY-MM-DD> or <product_id>:<status>, entries separated by ';'.",
         {"results": "One entry per product separated by ';', e.g. 'p1:250.50:2026-10-16; p2:refused'."},
-        "take_results(vars, RT, tool_arg(vars, 'submit_results', 'results', ARG_results))", rt)
+        "take_results_and_start(vars, RT, tool_arg(vars, 'submit_results', 'results', ARG_results))", rt)
     post = [t for t in spec.transfers if "post_verify" in t.stages]
-    neg_transitions = [when_eq("rec_pick", "results accepted", "commit", "ready"),
-                       when_eq("commit_fix", "results rejected", "commit", "invalid")]
+    loop = [when_eq("record_promise", "a promise to record", "next_step", "record"),
+            when_eq("record_note", "a note to record", "next_step", "note"),
+            when_eq(END, "nothing left to record", "next_step", "end")]
+    neg_transitions = [dict(t, description="results accepted: " + t["description"]) for t in loop]
+    neg_transitions.append(when_eq("commit_fix", "results rejected", "commit", "invalid"))
     neg_transitions += [tool_transition(f"transfer_{t.id}", t.trigger) for t in post]
     task = texts.negotiate_task(spec)
     nodes["negotiate"] = conversation(
@@ -138,39 +139,29 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
                                            "customer what you can offer instead under the rules, then continue."},
         tools=[submit_results], transitions=neg_transitions, max_turns=40, max_turn_target="close_final")
 
-    # --- kayıt ve not döngüleri -----------------------------------------------------------------------
-    nodes["rec_pick"] = code("rec_pick", snip("rec_pick(vars, RT)", "vars['rec_state'] = 'done'"),
-                             [when_eq("record_promise", "a promise to record", "rec_state", "go")], "note_pick")
+    # --- kayıt ve not döngüsü (her adım tek code node'u: yük altında code node'ları 3-6 sn sürüyor) -------
     rec_call = call("create_promise",
-                         {"customer_id": cid, "product_id": "{{rec_pid}}",
-                          "amount": "{{rec_amount}}", "date": "{{rec_date}}"},
-                         pre_hook=_coerce_hook(cat, "create_promise", rt))
-    nodes["record_promise"] = api_request("record_promise", rec_call, [("data.ok", "rec_r_ok")], "rec_after")
-    nodes["rec_after"] = code("rec_after", snip("rec_after(vars, RT)"), [], "rec_pick")
-    nodes["note_pick"] = code("note_pick", snip("note_pick(vars, RT)", "vars['note_state'] = 'done'"),
-                              [when_eq("record_note", "a note to record", "note_state", "go")], "close_final")
+                    {"customer_id": cid, "product_id": "{{rec_pid}}", "amount": "{{rec_amount:json}}",
+                     "date": "{{rec_date}}"})
+    nodes["record_promise"] = api_request("record_promise", rec_call, [("data.ok", "rec_r_ok")], "rec_step")
+    nodes["rec_step"] = code("rec_step", snip("after_record_step(vars, RT)", "vars['next_step'] = 'end'"), loop,
+                             END)
     if cat.has("add_note"):
-        note_call = call("add_note", {"customer_id": cid, "product_id": "{{note_pid}}",
-                                                "reason": "{{note_reason}}"})
-        nodes["record_note"] = api_request("record_note", note_call, [("data.ok", "note_r_ok")], "note_after")
+        note_call = call("add_note", {"customer_id": cid, "product_id": "{{note_pid}}", "reason": "{{note_reason}}"})
+        nodes["record_note"] = api_request("record_note", note_call, [("data.ok", "note_r_ok")], "note_step")
     else:
-        nodes["record_note"] = code("record_note", snip("vars['note_r_ok'] = 'true'"), [], "note_after")
-    nodes["note_after"] = code("note_after", snip("note_after(vars, RT)", "vars['note_i'] = '99'"), [],
-                               "note_pick")
+        nodes["record_note"] = code("record_note", snip("vars['note_r_ok'] = 'true'"), [], "note_step")
+    nodes["note_step"] = code("note_step", snip("after_note_step(vars, RT)", "vars['next_step'] = 'end'"), loop,
+                              END)
     nodes["close_final"] = close_node("close_final", "", "", "")
 
-    # --- transferler ----------------------------------------------------------------------------------
+    # --- transferler (kapanış transferden önce hazırlanır) ---------------------------------------------
     for t in spec.transfers:
         nodes[f"transfer_{t.id}"] = code(
-            f"transfer_{t.id}",
-            snip(f"vars['transfer_queue'] = {t.queue!r}\nvars['transfer_say'] = {t.say!r}\n"
-                 "vars['rec_queue'] = '[]'"), [], "do_transfer")
+            f"transfer_{t.id}", snip(f"transfer_and_close(vars, RT, {t.queue!r}, {t.say!r})"), [], "do_transfer")
     nodes["do_transfer"] = api_request(
-        "do_transfer", call("transfer_to_agent", {"customer_id": cid,
-                                                            "queue": "{{transfer_queue}}"}),
-        [("data.ok", "transfer_r_ok")], "close_transfer")
-    nodes["close_transfer"] = code("close_transfer", snip("set_close(vars, RT, '', '', vars.get('transfer_say', ''))"),
-                                   [], END)
+        "do_transfer", call("transfer_to_agent", {"customer_id": cid, "queue": "{{transfer_queue}}"}),
+        [("data.ok", "transfer_r_ok")], END)
 
     # --- üçüncü kişi -----------------------------------------------------------------------------------
     tp = spec.third_party
@@ -217,6 +208,8 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
     ]:
         nodes[name] = close_node(name, ref.outcome, ref.reason, speech)
     nodes[END] = end_call(END, "call_closed", "{{closing_speech}}")
+    # kod servisi çalışmazsa: değişken gerektirmeyen sabit veda (close_call yine lifecycle olarak çalışır)
+    nodes[FALLBACK_END] = end_call(FALLBACK_END, "call_closed_fallback", texts.tpl(spec.closing.goodbye_sentence))
 
     # --- close_call: çağrı bittiğinde engine çalıştırır, her zaman son çağrıdır -------------------------
     close_pre = build_snippet(
