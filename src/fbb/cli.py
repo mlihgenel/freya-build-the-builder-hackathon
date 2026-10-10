@@ -5,6 +5,7 @@
     uv run export-agent --slot brief-a
     uv run fbb cases <agent_id> --brief A [--reps 3] [--style pieces]
     uv run fbb chat <slot> "Hello?" --case PUB-01
+    uv run fbb specdiff out/<slot>.spec.json tests/fixtures/spec_a.json
 """
 from __future__ import annotations
 
@@ -63,7 +64,17 @@ def main(argv: list[str] | None = None) -> None:
     k.add_argument("--all", action="store_true", help="route ve değişken olaylarını da göster")
     r = sub.add_parser("report", help="bir run_cases sonucunun özeti ve başarısız çağrıların ID'leri")
     r.add_argument("path", help="results/*.json")
+    d = sub.add_parser("specdiff", help="iki spec'i karşılaştırır (PUAN / METİN / BİLGİ farkları)")
+    d.add_argument("spec", help="incelenen spec (ör. out/<slot>.spec.json)")
+    d.add_argument("reference", help="referans spec (ör. tests/fixtures/spec_a.json)")
+    d.add_argument("--info", action="store_true", help="BİLGİ düzeyindeki farkları da yaz")
     a = ap.parse_args(argv)
+    if a.cmd == "specdiff":
+        from fbb.specdiff import report
+
+        text, n_score = report(a.spec, a.reference, show_info=a.info)
+        print(text)
+        sys.exit(1 if n_score else 0)
     from fbb import kitapi
 
     if a.cmd == "call":
