@@ -176,6 +176,14 @@ def test_floor_and_amount_rules(ns):
     assert ns["attempt_amount"]("floor", 0.0, 400.0) == 400.0
 
 
+def test_floor_max_min_rules(ns):
+    rt = {"floor_rule": {"od": "max:percent:25,field:min_due", "car": "min:fixed:100,field:inst"}}
+    assert ns["floor_amount"]({"min_due": 50.0}, "od", 400.0, rt) == 100.0     # %25 büyük
+    assert ns["floor_amount"]({"min_due": 150.0}, "od", 400.0, rt) == 150.0    # alan büyük
+    assert ns["floor_amount"]({"inst": 80.0}, "car", 400.0, rt) == 80.0
+    assert ns["floor_amount"]({}, "car", 400.0, rt) == 0.0                     # eksik alan 0 sayılır
+
+
 def test_deadline_rules(ns, rt_a):
     cal = rt_a["cal"]
     today = D(2026, 10, 14)

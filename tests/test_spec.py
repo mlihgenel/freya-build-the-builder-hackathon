@@ -41,6 +41,19 @@ def test_cross_check_catches_bad_enum(cat):
     assert any("nope" in e for e in cross_check(spec, cat))
 
 
+def test_floor_rule_combinations(cat):
+    data = json.loads((FIX / "spec_a.json").read_text())
+    data["disclosure"]["floor_rule"] = {"credit_card": "max:percent:25,field:minimum_payment"}
+    spec = PolicySpec.model_validate(data)
+    assert cross_check(spec, cat) == []
+    spec.disclosure.floor_rule = {"credit_card": "max:percent:25,field:nope"}
+    assert any("nope" in e for e in cross_check(spec, cat))
+    for bad in ("max:percent:25", "avg:percent:25,fixed:10", "max:max:percent:1,fixed:2"):
+        data["disclosure"]["floor_rule"] = {"credit_card": bad}
+        with pytest.raises(ValidationError):
+            PolicySpec.model_validate(data)
+
+
 def test_overlapping_bands_rejected():
     data = json.loads((FIX / "spec_a.json").read_text())
     data["bands"][1]["min"] = 5

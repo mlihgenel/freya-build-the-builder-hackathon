@@ -57,9 +57,19 @@ def num(x, default=0.0):
 
 
 def floor_amount(product, ptype, past_due, RT):
-    """Ürünün floor'u: 'field:<alan>' | 'percent:N' | 'fixed:X' (RT['floor_rule'], '*' bütün tipler)."""
+    """Ürünün floor'u: 'field:<alan>' | 'percent:N' | 'fixed:X' | 'max:<k1>,<k2>' | 'min:<k1>,<k2>'
+    (RT['floor_rule'], '*' bütün tipler)."""
     rules = RT.get("floor_rule") or dict()
     rule = str(rules.get(ptype) or rules.get("*") or "")
+    return floor_by_rule(rule, product, past_due)
+
+
+def floor_by_rule(rule, product, past_due):
+    if rule.startswith("max:") or rule.startswith("min:"):
+        parts = [floor_by_rule(r.strip(), product, past_due) for r in rule[4:].split(",") if r.strip()]
+        if not parts:
+            return 0.0
+        return max(parts) if rule.startswith("max:") else min(parts)
     if rule.startswith("field:"):
         return num(product.get(rule[6:]), 0.0)
     if rule.startswith("percent:"):

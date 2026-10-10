@@ -45,7 +45,8 @@ class Opening(Strict):
 CALLBACK_DAY = r"^(today|next_business_day|business_days:\d+)$"
 AMOUNT_RULE = r"^(full|floor|percent:\d+(\.\d+)?|fixed:\d+(\.\d+)?)$"
 DEADLINE_RULE = r"^(business_days:\d+|calendar_days:\d+|end_of_month|date:\d{4}-\d{2}-\d{2})$"
-FLOOR_RULE = r"^(field:[A-Za-z_][\w]*|percent:\d+(\.\d+)?|fixed:\d+(\.\d+)?)$"
+_FLOOR_ONE = r"(field:[A-Za-z_][\w]*|percent:\d+(\.\d+)?|fixed:\d+(\.\d+)?)"
+FLOOR_RULE = rf"^({_FLOOR_ONE}|(max|min):{_FLOOR_ONE}(,{_FLOOR_ONE})+)$"
 
 
 class HourWindow(Strict):
@@ -150,7 +151,7 @@ class Disclosure(Strict):
     floor_field: dict[str, str] = Field(..., description="Ürün tipi → get_account'taki floor alanı")
     floor_rule: dict[str, str] = Field(
         default_factory=dict, description="floor_field yerine: ürün tipi → 'field:<alan>' | 'percent:N' (past_due'nun "
-        "yüzdesi) | 'fixed:X'. '*' anahtarı bütün tipler için")
+        "yüzdesi) | 'fixed:X' | 'max:<k1>,<k2>' / 'min:<k1>,<k2>' (büyüğü/küçüğü). '*' anahtarı bütün tipler için")
 
     @field_validator("floor_rule")
     @classmethod
@@ -460,8 +461,9 @@ def cross_check(spec: PolicySpec, cat: ToolCatalog) -> list[str]:
             if fname and fname not in items:
                 errs.append(f"floor alanı: '{fname}' ({ptype}) get_account ürünlerinde yok")
         for ptype, rule in spec.disclosure.floor_rule.items():
-            if rule.startswith("field:") and rule[6:] not in items:
-                errs.append(f"floor kuralı: '{rule}' ({ptype}) get_account ürünlerinde yok")
+            for part in re.sub(r"^(max|min):", "", rule).split(","):
+                if part.startswith("field:") and part[6:] not in items:
+                    errs.append(f"floor kuralı: '{part}' ({ptype}) get_account ürünlerinde yok")
         for role in ("product_id", "product_type", "past_due", "days_late"):
             if getattr(rf, role) not in items:
                 errs.append(f"cevap alanı {role}: '{getattr(rf, role)}' get_account ürünlerinde yok")

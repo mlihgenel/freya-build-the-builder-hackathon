@@ -13,7 +13,7 @@
 | F3b | Brief A simülasyonu | A tek çalışmada ≥ 9/10, iki kez | 🟡 eski graf 10/10 ×1; `--reps 3` 3/10 (kesinti + review hataları) |
 | R1 | Review düzeltmeleri (`11_REVIEW.md` C.1–C.6) | testler yeşil, L1/L2 temiz | ✅ kod + test (10 Eki 20:35); L4 ölçümü bekliyor |
 | F4 | Brief B | 13/13 bir kez, `--reps 3` ile ≥ 11/13 | ⏳ yeni graf ölçülmedi |
-| F6 | varyant provası (C/D/E), G-01 cevap alanı eşlemesi | çökme yok, ≥ %80 | 🟡 G-01 ✅, varyant openapi birim testi ✅ (`test_variant_openapi_does_not_crash`); simülasyon provası yok |
+| F6 | varyant provası (C/D/E), G-01 cevap alanı eşlemesi | çökme yok, ≥ %80 | 🟡 G-01 ✅, varyant openapi birim testi ✅ (`test_variant_openapi_does_not_crash`); ham materyal provası C (LLM, `--no-deploy`) ✅ lint 0; simülasyon provası yok |
 | F7 | stiller + 3 tekrar | bilinmeyen sebeple 3/3 altında vaka yok | |
 | F8 | teslim provası: temiz kopyadan 2 brief art arda | tek komut, brief başına ≤ 10 dk | |
 | — | **Özellik dondurma: Pazar 18:00 TR** | | |
