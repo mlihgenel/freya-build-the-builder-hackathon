@@ -72,3 +72,28 @@ def test_cross_check_hardship_status(cat):
     spec = load("spec_a.json")
     spec.negotiation.hardship_status = "nope"
     assert any("hardship_status" in e for e in cross_check(spec, cat))
+
+
+def test_kit_api_retries_transient_get_errors(monkeypatch):
+    """Kitin api'si GET'te geçici 5xx'i tekrar dener, POST'u ve kalıcı hatayı denemez (11 Eki 504'leri)."""
+    import types
+
+    from fbb import kitapi
+
+    calls = []
+
+    def flaky(method, path, body=None, **params):
+        calls.append(method)
+        if len(calls) == 1:
+            raise RuntimeError(f"{method} {path} -> 504: error code: 504")
+        if method == "POST":
+            raise RuntimeError(f"{method} {path} -> 503: busy")
+        return {"ok": True}
+
+    mod = types.SimpleNamespace(api=flaky)
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    kitapi._retry_gets(mod)
+    assert mod.api("GET", "/x") == {"ok": True} and calls == ["GET", "GET"]
+    with pytest.raises(RuntimeError):
+        mod.api("POST", "/y")
+    assert calls[-1] == "POST" and len(calls) == 3

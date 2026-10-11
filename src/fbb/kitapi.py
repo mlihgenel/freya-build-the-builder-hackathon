@@ -25,7 +25,36 @@ def freya():
     sys.path.insert(0, str(config.KIT / "tools"))
     import freya as kit_freya  # noqa: E402
 
+    _retry_gets(kit_freya)
     return kit_freya
+
+
+def _retry_gets(mod) -> None:
+    """Kitin api'sine GET tekrarı: 5xx ve ağ hataları 10, 20, sonra 30'ar sn arayla 11 kez daha denenir (~5 dk; POST
+    denenmez: simülasyon iki kez başlamasın). Durum sorgusundaki tek bir 504 bütün koşuyu düşürüyordu; platform
+    kesintileri 2 dk'yı aştı (11 Eki)."""
+    if getattr(mod.api, "_fbb_retry", False):
+        return
+    import time
+    import urllib.error
+
+    orig = mod.api
+
+    def api(method, path, body=None, **params):
+        for attempt in range(12):
+            try:
+                return orig(method, path, body, **params)
+            except (RuntimeError, urllib.error.URLError, TimeoutError) as e:
+                transient = isinstance(e, (urllib.error.URLError, TimeoutError)) or any(
+                    f"-> {code}" in str(e) for code in (500, 502, 503, 504))
+                if method != "GET" or not transient or attempt == 11:
+                    raise
+                wait = min(10 * (attempt + 1), 30)
+                print(f"[fbb] {method} {path}: {str(e)[:60]} → {wait} sn sonra tekrar", flush=True)
+                time.sleep(wait)
+
+    api._fbb_retry = True
+    mod.api = api
 
 
 def validate(name: str, workflow: dict):
@@ -88,7 +117,7 @@ def run_cases(agent_id: str, *, brief: str = "", only: str = "", reps: int = 1, 
 
     out = (out or (config.RESULTS / f"run-{agent_id[:8]}-{time.strftime('%m%d-%H%M%S')}.json")).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [sys.executable, str(config.KIT / "tools" / "run_cases.py"), agent_id, "--out", str(out)]
+    cmd = [sys.executable, "-m", "fbb.kit_runner", agent_id, "--out", str(out)]
     if brief:
         cmd += ["--brief", brief]
     if only:
