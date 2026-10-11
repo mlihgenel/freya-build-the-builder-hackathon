@@ -81,6 +81,7 @@ def refine(cases: list[str], wf_path: Path | None, mock_url: str, slot: str, tra
     work = config.OUT / f"{slot}-refine"
     work.mkdir(parents=True, exist_ok=True)
     (work / "workflow.json").unlink(missing_ok=True)
+    (work / "last_saved.json").unlink(missing_ok=True)
     if wf_path is not None:
         shutil.copy2(wf_path, work / "workflow.json")
     os.environ["FBB_MOCK_URL"] = mock_url

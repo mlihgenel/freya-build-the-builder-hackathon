@@ -38,7 +38,8 @@ Follow the Freya workflow reference below exactly (node types, fields, tools, tr
 - Tools that call the bank are `__function__:api_call` functions on conversation nodes (`tools`) or engine calls on
   api_request nodes (`pre_actions`); urls are the given API base URL + the path, bodies as leaves under
   body.properties with `default` values. Call variables (e.g. the customer number) are baked with "{{var}}"; fields the
-  model fills have no default (or a default naming an unset variable) and a description.
+  model fills have no default (or a default naming an unset variable) and a description. If the documents or test
+  data say a service can answer slowly, set the call's config.timeoutMs above the longest documented delay.
 - Never ask the caller for something the call already gives as a variable. Use every call variable the documents list.
 - Every date decision uses the call variable for the current date/time, never the real clock. Where dates must be
   computed, compute them in a code node (`code_exec`, only json/re/datetime, never raise, never write two braces next to

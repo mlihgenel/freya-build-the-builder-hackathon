@@ -145,7 +145,11 @@ def _run_generic(opts: BuildOptions, slot: str, trace: Trace, cat, tools_path: s
         wf = _agentic_write(opts, slot, trace, tools_path)
         if not wf:
             trace.event("mode", "ajan modu geçerli workflow bırakmadı: tek seferlik yazıma dönülüyor")
-    for attempt in range(0 if wf else 3):
+    attempts = 0 if wf else 3
+    if agentic and not wf and trace.elapsed() > ONE_SHOT_UNTIL_S:  # tek seferlik yazım 30 dk sınırını aşar
+        attempts = 0
+        problems = ["ajan modu geçerli workflow bırakmadı ve tek seferlik yazıma süre kalmadı"]
+    for attempt in range(attempts):
         out = write_workflow(docs, api_text, cat.base_url, trace, problems or None, previous)
         try:
             wf = json.loads(out.workflow_json)
@@ -198,6 +202,7 @@ def _run_generic(opts: BuildOptions, slot: str, trace: Trace, cat, tools_path: s
     return result
 
 
+ONE_SHOT_UNTIL_S = 12 * 60  # tek seferlik yazım ~16 dk sürebilir (final-try1): sonra başlatılırsa 30 dk aşılır
 REFINE_UNTIL_S = 25 * 60  # brief başına 30 dk sınırı: refine en geç build'in 25. dakikasında biter
 
 
@@ -208,14 +213,28 @@ def _agentic_write(opts: BuildOptions, slot: str, trace: Trace, tools_path: str)
     from fbb.agent_tools import local_check
     from fbb.refine import refine
 
+    problems: list[str] = []
+    wf: dict = {}
+    work = config.OUT / f"{slot}-refine"
     try:
-        path = refine(opts.briefs, None, opts.base_url, slot, trace, REFINE_UNTIL_S - trace.elapsed(), api=tools_path)
-        wf = json.loads(path.read_text())
-        problems = local_check(wf)
-        if not problems:
-            kitapi.validate(f"{slot} dry-run", wf)
-    except Exception as e:  # ajan hiçbir durumda build'i düşürmez
+        refine(opts.briefs, None, opts.base_url, slot, trace, REFINE_UNTIL_S - trace.elapsed(), api=tools_path)
+    except Exception as e:  # ajan hiçbir durumda build'i düşürmez (ör. Claude limiti); kaydettiği sürüm yine denenir
         problems = [f"{type(e).__name__}: {str(e)[:300]}"]
+        trace.event("agentic_error", problems[0])
+    # yarım kalan dosya geçmezse ajanın son başarılı kaydı
+    for cand in (work / "workflow.json", work / "last_saved.json"):
+        if not cand.exists():
+            continue
+        try:
+            wf = json.loads(cand.read_text())
+            problems = local_check(wf)
+            if not problems:
+                kitapi.validate(f"{slot} dry-run", wf)
+                if cand.name == "last_saved.json":
+                    trace.event("mode", "ajanın son dosyası geçmedi: son başarılı kaydı kullanılıyor")
+                break
+        except Exception as e:
+            problems = [f"{cand.name}: {type(e).__name__}: {str(e)[:300]}"]
     trace.event("agentic_result", f"{len(problems)} sorun", problems=problems)
     return {} if problems else wf
 

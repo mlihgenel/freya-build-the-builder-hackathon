@@ -91,6 +91,11 @@ integration document. Every URL in the workflow must start with that address. Us
 names and request shapes as the integration document. Before wiring a service, call the mock with curl for a test
 customer to see the real response shape, and map exactly those fields.
 
+Timeouts: an api_call attempt times out after `config.timeoutMs` (10000 ms in the examples). If the documents or
+the test data say an answer can take longer (slow responses, a delay field), set `timeoutMs` above the longest one
+with a margin and keep `maxRetries` low, and test that customer by chat. While waiting, the agent says one short
+"one moment" line; a timeout is handled like a technical error, never as "not found".
+
 ## 5. Loop
 
 1. If `<work>/workflow.json` exists, read it and list what is missing or wrong compared with the documents (every

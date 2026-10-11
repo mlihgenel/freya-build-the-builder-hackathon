@@ -97,6 +97,8 @@ def cmd_save(slot: str, path: str) -> int:
         return 1
     wf = json.loads(Path(path).read_text())
     ids = kitapi.save(slot, wf)
+    # son başarılı kayıt: ajan süre dolarken dosyayı yarım bırakırsa build bu kopyayı kullanır
+    Path(path).with_name("last_saved.json").write_text(json.dumps(wf, indent=1, ensure_ascii=False))
     stored = kitapi.get(ids["workflow_id"]).get("workflow") or {}
     lost = sorted(set(wf.get("nodes") or {}) - set(stored.get("nodes") or {}))
     dropped = [k for k, n in (wf.get("nodes") or {}).items()
