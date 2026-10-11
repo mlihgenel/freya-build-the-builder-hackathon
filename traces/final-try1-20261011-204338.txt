@@ -3,3 +3,9 @@
 [2026-10-11T20:44:50+0300 +  71.1s] generic_api: 7 yol çıkarıldı
 [2026-10-11T20:44:50+0300 +  71.1s] tools: 7 tool, base https://yz50-bank-mock.kirgilmert.workers.dev/voice/v1
 [2026-10-11T20:44:50+0300 +  71.1s] mode: vaka tahsilat formatında değil (yedi tahsilat tool'u yok): genel yol, workflow'u Claude yazar
+[2026-10-11T21:17:12+0300 +2013.8s] model_call: claude-opus-5-5 — vaka belgeleri → workflow (deneme 1) (1943 s, $6.788)
+[2026-10-11T21:17:12+0300 +2013.8s] generic_workflow: deneme 1: 33 node, 15 sorun, 0 uyarı
+[2026-10-11T21:17:14+0300 +2015.6s] model_call: claude-opus-5-5 — vaka belgeleri → workflow (düzeltme) (deneme 1) (2 s, HATA)
+[2026-10-11T21:17:17+0300 +2018.8s] model_call: claude-opus-5-5 — vaka belgeleri → workflow (düzeltme) (deneme 2) (3 s, HATA)
+[2026-10-11T21:17:19+0300 +2020.2s] model_call: claude-opus-5-5 — vaka belgeleri → workflow (düzeltme) (deneme 3) (1 s, HATA)
+[2026-10-11T21:17:19+0300 +2020.2s] error: build başarısız: vaka belgeleri → workflow (düzeltme): geçerli çıktı alınamadı: call failed: Claude hatası: You've hit your session limit · resets 12:10am (Europe/Istanbul)

@@ -5,7 +5,7 @@
     { "name": "Mert Kırgıl", "email": "kirgilmert@gmail.com" }
   ],
   "repo": "https://github.com/mlihgenel/freya-build-the-builder-hackathon",
-  "commit": "90d68282208c25e34c670a6048492df2b9ddbc66",
+  "commit": "a9aa5fa24bf857c9b8442ff5514be7eadd3311a4",
   "run_command": "python3 builder/build.py final https://yz50-bank-mock.kirgilmert.workers.dev 2>&1 | tee traces/final.log",
   "workflow": "exports/final.workflow.json",
   "trace": "traces/final.log",
