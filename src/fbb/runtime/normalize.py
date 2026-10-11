@@ -33,7 +33,7 @@ def word_value(word):
     return None
 
 
-TR_FOLD = dict(zip("ışğüöçâîû", "isguocaiu"))
+TR_FOLD = dict(zip("ışğüöçâîû", "isguocaiu", strict=True))
 TR_WORDS = dict(
     sifir="zero", bir="one", iki="two", uc="three", dort="four", bes="five", alti="six", yedi="seven", sekiz="eight",
     dokuz="nine", on="ten", yirmi="twenty", otuz="thirty", kirk="forty", elli="fifty", altmis="sixty",

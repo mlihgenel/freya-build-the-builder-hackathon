@@ -41,8 +41,8 @@ def run_build(opts: BuildOptions) -> dict:
     result: dict = {"slot": slot, "trace": str(trace.txt)}
     try:
         tools_path = opts.tools
-        if not tools_path:  # final formatı: klasörde openapi yoksa servis sözleşmesinden çıkar
-            from fbb.ingest.contract import openapi_from_contract
+        if not tools_path:  # final formatı: klasörde openapi yoksa API vaka belgelerinden çıkarılır
+            from fbb.generic import openapi_for_case
             from fbb.ingest.sources import find_openapi
 
             found = find_openapi(opts.briefs)
@@ -51,12 +51,17 @@ def run_build(opts: BuildOptions) -> dict:
                 trace.event("tools_file", f"tool API dosyası klasörde bulundu: {found}")
             else:
                 config.OUT.mkdir(parents=True, exist_ok=True)
-                tools_path = str(openapi_from_contract(read_sources(opts.briefs), config.OUT / f"{slot}.openapi.json",
-                                                       trace))
+                tools_path = str(openapi_for_case(read_sources(opts.briefs), config.OUT / f"{slot}.openapi.json", trace))
         cat = load_catalog(tools_path)
         if opts.base_url:
             cat.base_url = with_base(opts.base_url, cat.base_url)
         trace.event("tools", f"{len(cat.tools)} tool, base {cat.base_url}", tools=sorted(cat.tools))
+        from fbb.generic import is_collection_case
+
+        if not opts.spec_file and not is_collection_case(list(cat.tools)):
+            trace.event("mode", "vaka tahsilat formatında değil (yedi tahsilat tool'u yok): genel yol, workflow'u "
+                        "Claude yazar")
+            return _run_generic(opts, slot, trace, cat, tools_path, result)
         if opts.spec_file:
             spec = PolicySpec.model_validate(json.loads(Path(opts.spec_file).read_text()))
             trace.event("spec", f"spec dosyadan okundu: {opts.spec_file}")
@@ -122,6 +127,66 @@ def run_build(opts: BuildOptions) -> dict:
     except Exception as e:
         trace.event("error", f"build başarısız: {e}")
         raise
+
+
+def _run_generic(opts: BuildOptions, slot: str, trace: Trace, cat, tools_path: str, result: dict) -> dict:
+    """Genel yol (fbb.generic): Claude workflow'u yazar; lint ve Freya dryRun hataları en fazla iki kez geri verilir."""
+    from fbb.generic import write_workflow
+
+    docs = read_sources(opts.briefs)
+    api_text = Path(tools_path).read_text()
+    problems: list[str] = []
+    previous = ""
+    wf: dict = {}
+    warnings: list[str] = []
+    for attempt in range(3):
+        out = write_workflow(docs, api_text, cat.base_url, trace, problems or None, previous)
+        try:
+            wf = json.loads(out.workflow_json)
+        except ValueError as e:
+            problems, previous = [f"workflow_json is not valid JSON: {e}"], out.workflow_json[:300000]
+            continue
+        warnings = []
+        problems = lint(wf, cat, call_vars=out.call_variables, forbidden_pre_verify=[], warnings=warnings,
+                        check_tools=False)
+        if not problems and opts.deploy:
+            from fbb import kitapi
+
+            try:
+                kitapi.validate(f"{slot} dry-run", wf)
+            except Exception as e:  # dryRun hatası düzeltme turuna gider
+                problems = [f"Freya dry run rejected the workflow: {str(e)[:3000]}"]
+        trace.event("generic_workflow", f"deneme {attempt + 1}: {len(wf.get('nodes', {}))} node, "
+                    f"{len(problems)} sorun, {len(warnings)} uyarı", problems=problems, warnings=warnings,
+                    notes=out.notes, call_variables=out.call_variables)
+        if not problems:
+            break
+        previous = json.dumps(wf, ensure_ascii=False)
+    config.OUT.mkdir(parents=True, exist_ok=True)
+    wf_path = config.OUT / f"{slot}.workflow.json"
+    wf_path.write_text(json.dumps(wf, indent=1, ensure_ascii=False))
+    n_tools = sum(len(n.get("tools", [])) + len(n.get("pre_actions", [])) for n in wf.get("nodes", {}).values())
+    trace.event("workflow", f"{len(wf.get('nodes', {}))} node, {n_tools} tool, hash {workflow_hash(wf)}, "
+                f"lint {len(problems)} sorun", path=str(wf_path), lint=problems, bytes=len(json.dumps(wf)))
+    result.update(workflow=str(wf_path), lint=problems, warnings=warnings, openapi=tools_path)
+    if problems:
+        raise RuntimeError("workflow düzeltilemedi: " + "; ".join(problems[:5]))
+    if not opts.deploy:
+        trace.event("end", "deploy kapalı, yerel çıktı hazır")
+        return result
+    from fbb import kitapi
+
+    ids = kitapi.save(slot, wf)
+    trace.event("freya_saved", f"workflow {ids['workflow_id']} agent {ids['agent_id']}", **ids)
+    result.update(ids)
+    stored = kitapi.get(ids["workflow_id"])["workflow"]
+    lost = _diff_stored(wf, stored)
+    trace.event("freya_readback", f"platformda saklanan workflow kontrol edildi ({len(lost)} fark)", lost=lost)
+    export_path = kitapi.export(ids["workflow_id"], config.EXPORTS / f"{slot}.workflow.json")
+    trace.event("export", f"export yazıldı: {export_path}")
+    result["export"] = str(export_path)
+    trace.event("end", f"build bitti: {trace.elapsed():.0f} s, {trace.model_calls} model çağrısı, ${trace.cost_usd:.2f}")
+    return result
 
 
 def with_base(mock_url: str, server_url: str) -> str:

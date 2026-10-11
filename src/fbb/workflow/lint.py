@@ -34,7 +34,7 @@ def _code_strings(node: dict) -> list[str]:
 
 
 def lint(workflow: dict, cat: ToolCatalog, *, call_vars: list[str], forbidden_pre_verify: list[str],
-         warnings: list[str] | None = None) -> list[str]:
+         warnings: list[str] | None = None, check_tools: bool = True) -> list[str]:
     """Hata listesi döner (build bunlarda durur). `warnings` verilirse deploy'u durdurmayan bulgular oraya yazılır:
     gizli bir openapi'de beklenmeyen zorunlu alan agent'ı hiç kurmamaktan iyidir."""
     errs: list[str] = []
@@ -138,8 +138,8 @@ def lint(workflow: dict, cat: ToolCatalog, *, call_vars: list[str], forbidden_pr
         if re.search(r"\brecorded\b", spoken):
             warns.append(f"{name}: açılışta 'recorded' kelimesi var: brief cümleyi birebir veriyorsa doğru, vermiyorsa hakem promise kaydı sanabilir")
 
-    # bankaya giden alanlar openapi'de var mı
-    for name, n in list(nodes.items()) + [("tools", {"pre_actions": workflow.get("tools", [])})]:
+    # bankaya giden alanlar openapi'de var mı (genel yolda tool adları vakanın API'sine göre: denetlenmez)
+    for name, n in (list(nodes.items()) if check_tools else []) + [("tools", {"pre_actions": workflow.get("tools", [])})]:
         for fn in n.get("pre_actions", []):
             f = fn.get("function", {})
             if f.get("handler") != "__function__:api_call":
