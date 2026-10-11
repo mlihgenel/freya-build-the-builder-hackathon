@@ -5,7 +5,9 @@
 > - Yarım kalan madde `[~]` ile işaretlenir ve ne kaldığı yazılır.
 > - **"📍 Şu an"** satırı her adımda güncellenir.
 
-**📍 Şu an:** Faz 4 ✅, Faz 2 ✅, Faz 3.1/3.3 ✅ (11 Eki ~05:00). Son sürüm: A 10/10 ve B 3/3 pass³, talkative A 10/10 · B 3/3, PUB-05 dört stilde 4/4. Sıradaki: Faz 3.2 (müşteri callback'i canlı), Faz 5 (Brief C/D provası), Faz 6.
+**📍 Şu an (11 Eki ~11:05):** Adım 0–2 ✅ (teslim provası, `fbb scenarios`), Faz 3 ✅ (3.2/3.4/3.5/3.6 + canlı bulunan 3.9), Faz 5.1–5.2 ✅. Sıradaki: 5.3 chat provası (açılış cümlesi sorusu), SC-04/05 `--reps 3`, A regresyonu, stiller.
+
+**Önceki (05:00):** Faz 4 ✅, Faz 2 ✅, Faz 3.1/3.3 ✅ (11 Eki ~05:00). Son sürüm: A 10/10 ve B 3/3 pass³, talkative A 10/10 · B 3/3, PUB-05 dört stilde 4/4. Sıradaki: Faz 3.2 (müşteri callback'i canlı), Faz 5 (Brief C/D provası), Faz 6.
 
 **Son durum (11 Eki ~01:00):**
 - `e2e58b2`: altın spec ile A 10/10 ve B 3/3 pass³.
@@ -82,14 +84,17 @@ Amaç: finale en yakın testleri koşmak, sorunları **genel** olarak düzeltmek
 
 ## Faz 3: Kod yolları (gizli brief tipi senaryolar, birim/graf testi)
 - [x] 3.1 `per_product` kayıt + `next_offer` → eksikti: kabul edilen ürün kaydedilmeden sıradaki ürüne geçiliyordu (fiilen toplu kayıt). Düzeltme: per_product'ta kabul → o ürün (+ bekleyen durumlar) hemen read-back ve kayıt; kayıttan sonra 'kaydedildi' + sıradaki ürünün 1. teklifi tek cümlede (`next_offer_say`); propose edilenler `offers_json.proposed`'da (çift öneri yok). Testler: `test_per_product_with_next_offer`, `test_per_product_last_product_agreed_after_refusals`. Canlı prova (`mert-pp`, spec_ab + per_product): PUB-12, PUB-13 2/2, transcript'te ürün başına kayıt görüldü (11 Eki ~05:00)
-- [ ] 3.2 Müşteri callback'i (`customer_callback`) + `next_offer`
+- [x] 3.2 Müşteri callback'i (`customer_callback`) + `next_offer` → canlı (11 Eki, `var-cc` = spec_a + customer_callback, `fbb scenarios` SC-04/05). SC-04 (yarın 15:00) ✅ callback kuruldu. SC-05 (pencere dışı iki kez) ledger ✅; hakem 'iki kez sordu' dedi: (1) model saat vermeyen gün için saat soruyordu → `propose_callback` sadece günle de çağrılır, geçerli günde yalnız saat sorulur (tekrar sayılmaz), geçersiz gün tek tekrar sayılır (`test_callback_day_only`); (2) callback node'u müşterinin zaten söylediği zamanı tekrar soruyordu → açılış artık 'Pazartesi 20:00, doğru mu?' onay sorusu. Varyant notu: kit mock'u `no_promise` için sadece refused/hardship/dispute/service_error kabul ediyor
 - [x] 3.3 Bir üründe dispute/paid, diğerinde ret: `propose_results` ↔ `offers_json` uyumu → `merge_offer_results`: modelin listesinde olmayan ürünler next_offer sonuçlarından tamamlanır (`test_propose_results_keeps_offers_already_agreed`)
-- [ ] 3.4 Teklif sırasında transfer (B kural 10): kaydedilmemiş anlaşma kaydedilmez, not yazılmaz
-- [ ] 3.5 "No speakable content" denetimi: her model tool'u bir geçişle bitiyor mu (test)
-- [ ] 3.6 Kod servisi kesintisinde `offer_step` ve `propose_step` → `fallback_close` (test)
+- [x] 3.4 Teklif sırasında transfer (B kural 10): kaydedilmemiş anlaşma kaydedilmez, not yazılmaz → canlı SC-01 (batch, dev-b) ✅ ×2, SC-02 (per_product, 1 kayıt sonra transfer) ✅
+- [x] 3.5 "No speakable content" denetimi → `test_every_model_tool_call_routes` (3 spec × 10 aksiyon × 3 derinlik): her tool çağrısı bir geçişe gider VE konuşma node'una girince eski bayrak tetiklenmez. Bu değişmez iki gerçek hata buldu: `negotiate_more` `go_more` self-loop (SC-03'teki 70 tekrar) ve `propose_step`'te önceki `next_offer`'dan kalan `offer_go`
+- [x] 3.6 Kod servisi kesintisinde `offer_step` ve `propose_step` → `fallback_close` → `test_every_code_node_has_service_failure_exit` (her code node'unun ilk geçişleri `<node>_failure_count`)
 
 - [x] 3.7 (11 Eki ~02:30, Mert) Ret turu gecikmesi: tool + `offer_step` + `commit_fix` = 3 code node → ~10 sn sessizlik (B koşusu, medyan en yavaş tur 10 sn). `offer_step` artık bayrağı kendisi temizleyip `negotiate_fix_say`'e gidiyor (`offer_go`); medyan 2 sn'ye indi (`test_offer_goes_straight_to_speech`)
 - [x] 3.8 (11 Eki ~02:35, Mert) Model sadece 1. ürün kabul edilmişken `agreed_all` dedi; read-back reddinden sonra teklif durumu kapalı kaldığı için diğer ürünlere hiç teklif yapılmadı. `readback_reset` son `next_offer`'ı geri alıyor (`offers_prev`), `agreed_all` açıklaması netleşti (`test_readback_rejection_reopens_offers`)
+- [x] 3.9 (11 Eki ~10:50) **Aynı turda iki tool / teklif sırasında durum** (SC-03, canlı bulundu): 'kartı yarın öderim, krediyi ödemem, araç kredisi benim değil' → model `next_offer(agreed p1)` + `propose_results(p3:dispute)`; ikincisi `commit`'i ezdi, p1 kayboldu, `negotiate_more` 70 kez kendine döndü. Düzeltme (genel, iki modda): tool'lar `offer_pending`/`propose_pending` işaretler, önce durumlar işlenir (`fold_statuses`: durumlar `offers_json`'a yazılır, teklif imleci `next_open` ile o ürünleri atlar), sonra teklif cevabı; `go_more` sadece kod adımından çıkar. Testler: `test_agree_one_and_dispute_another_in_one_turn_{per_product,batch}` (iki sıra), `test_status_for_current_product_moves_to_next_offer`. Canlı: SC-03 ✅, B 3/3
+- [x] 3.10 (11 Eki) Lint boyut sınırı hata → uyarı: dryRun 450 KB / 700 KB / 1,2 MB'ı kabul etti; 400 KB hatası gizli bir brief'i (callback + per_product + 3 bant ≈ 365 KB) boşuna durdurabilirdi
+- [x] 3.11 (11 Eki ~11:20) Callback: (1) `propose_callback` → `check_callback_time` (hakem pencere dışı bir *kontrol* çağrısını 'kurulmuş callback' saydı); (2) callback node'una girişte müşteri zamanı zaten söylediyse onay sorusu; (3) `customer_callback.no_callback_outcome` (yeni, isteğe bağlı): brief müşteriye geçerli zaman verilmezse ayrı bir kapanış istiyorsa (D kural 11) kendi sabit kapanışı; boşsa genel kapanış. Testler: `test_callback_day_only`, `test_customer_callback_no_callback_outcome`. PUB-02 ×3 3/3
 
 ## Faz 4: Farklı takvim günleri
 - [x] 4.1 Runtime birim testleri: Cuma 2026-10-16, Cuma 2026-10-23 (26 Ekim tatil öncesi) ve Çarşamba 2026-12-23 (yıl sonu tatilleri) için `prep_account` ve `day_table` beklentileri
@@ -108,17 +113,18 @@ Amaç: finale en yakın testleri koşmak, sorunları **genel** olarak düzeltmek
 **Çıkış:** üç günde ledger farkı yok ya da sebebi ayrılmış ve düzeltilmiş. ✅
 
 ## Faz 5: Uydurma brief D ve chat provası
-- [ ] 5.1 `tests/fixtures/variants/brief_d.md` + `openapi_d.json` (temiz spec formatı; 3 ürün, 3 bant, `per_product`, müşteri callback'i, farklı outcome tablosu, posta kodu + doğum yılı) + `spec_d_expected.json`
-- [ ] 5.2 `build-agent --no-deploy` (C ve D) + `specdiff`
-- [ ] 5.3 C ve D deploy + `fbb chat` ile elle prova: açılış, kimlik soruları, hata yolunda dürüst cümle, çökme yok
-- [ ] 5.4 D ile workflow boyutu (< 340 KB; aşarsa `prune_rt` ya da tek node deseni)
+- [x] 5.1 `tests/fixtures/variants/brief_d.md` + `openapi_d.json` (temiz spec formatı; 3 ürün, 3 bant, `per_product`, müşteri callback'i, farklı outcome tablosu, posta kodu + doğum yılı) + `spec_d_expected.json` → yazıldı; beklenen spec LLM çıkarımının elle denetlenmiş hali (bütün puan alanları brief'le aynı)
+- [x] 5.2 `build-agent --no-deploy` (C ve D) + `specdiff` → C: 7 README maddesinin hepsi doğru (channel sabiti, cevap alanları, `{card_last4}`, tarihli memo override, overdraft `max:` floor, `business_days:2`, postcode) + memo tatili; `spec_c_expected.json`. D: 52 node, lint 0; 2. çıkarımla tek PUAN farkı `transfers.general.stages` (insan isteği kimlikten önce de geçerli mi; brief söylemiyor) → `extract.md`'ye genel kural: insan isteği brief kısıtlamadıkça iki aşamada
+- [x] 5.3 C ve D deploy + `fbb chat` ile elle prova: açılış, kimlik soruları, hata yolunda dürüst cümle, çökme yok → prova-c, prova-d kuruldu (lint 0). Chat: robot sorusu, harf harf posta kodu birleşti (`SW1A1AA`, `EC1A1BB`), mock alanı tanımayınca 'could not check that answer' + tekrar soru (eşleşmiyor denmedi). Chat'te C'nin kayıt cümlesi düştü → sesli simülasyonda birebir söylendiği doğrulandı (chat'e özgü, `docs/02`)
+- [x] 5.4 D ile workflow boyutu → D 364 KB, var-cc 352 KB (json.dumps). dryRun 1,2 MB'ı kabul ettiği için lint'te boyut hata değil uyarı (3.10)
+- [x] 5.5 İkili çıkarım: C 2 çıkarım → `specdiff` kimlik eşlemesi (`status_to_reason`) ve override notu gürültüsü ayıklandıktan sonra **0 PUAN farkı**; D 3 çıkarım → tek fark (insan isteğinin aşaması) `extract.md` kuralıyla kapandı, 3. çıkarım **0 fark**. Finalde ikinci çıkarım + `specdiff` adımı `docs/07` §3'e eklendi
 
 ## Faz 6: Dayanıklılık ve operasyon
-- [ ] 6.1 Builder modeli kararı: Opus ve Sonnet ile A+B süresi ve `specdiff` → `docs/07`'ye yazılır
-- [ ] 6.2 Teslim provası (F8): temiz klon → `uv sync` → `.env` → iki brief art arda tek komutla; `exports/` ve `traces/` kontrolü
-- [ ] 6.3 `make secrets-check freeze-check` hedefleri (yoksa ekle)
-- [ ] 6.4 Ağ: final makinesinde mock'a `curl`; DNS 1.1.1.1 / hotspot yedeği `docs/07` acil durum tablosuna
-- [ ] 6.5 Kredi durumu; gerekirse yavuz@freyavoice.ai'den ek kredi
+- [x] 6.1 Builder modeli kararı → **Opus** (varsayılan `claude-opus-5-5`): LLM çıkarımları (A×4, C×2, D×3) puan alanlarında altın/beklenen spec'le 0 fark (kural düzeltmelerinden sonra); A+B 109 sn / $1.00. Sonnet yalnız acil durum yedeği (`docs/07`)
+- [x] 6.2 Teslim provası (F8): temiz klon → `uv sync` → `.env` → iki brief art arda tek komutla; `exports/` ve `traces/` kontrolü → (11 Eki 10:34) temiz klonda `uv sync` 1 sn, 130 test yeşil; A+B build **109 sn, $1.00** (Opus: çıkarım 55 sn + denetim 51 sn), 45 node, lint 0, dryRun ✅, geri okuma 0 fark, workflow 359 KB (kaydedildi), export 395 KB ve `close_call` içeriyor; trace'te `workflow_id` export'la aynı; `secrets-check` temiz; `.gitignore` `final-*` trace/export'u içeri alıyor, `prova-*`'yı dışarıda tutuyor. `specdiff` altın spec_ab'ye karşı **0 PUAN farkı** (4. bağımsız çıkarım). Elle müdahale gerekmedi
+- [x] 6.3 `make secrets-check freeze-check` hedefleri → zaten `Makefile`'da
+- [~] 6.4 Ağ: bu makineden mock'a practice session açıldı (11 Eki 10:25). Final makinesi farklıysa orada tekrar `curl`; yedekler `docs/07` acil durum tablosunda
+- [~] 6.5 Kredi: API kredi bilgisini vermiyor (`/api/v2/workspaces`'te yok); panelden kontrol edilmeli. Workspace'te ~15 workflow (sınır 200)
 
 ## Faz 7: Dondurma (Paz 18:00 TR)
 - [ ] 7.1 Bütün slotlar son commit'le yeniden kurulur

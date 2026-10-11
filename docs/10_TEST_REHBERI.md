@@ -254,6 +254,10 @@ staging-app.freyavoice.ai → çağrı kayıtları. Simülasyon çağrıları "S
 | 04:20 | aynı sürüm | A / B `--reps 3` | **10/10**, **3/3** | |
 | 04:30–04:55 | son sürüm (hardship sade, değişken dinleme cevabı) | talkative A/B, PUB-05 × 4 stil, A/B `--reps 3` | **10/10**, **3/3**, **4/4**, **10/10**, **3/3** | bu grupta hiç düşüş yok |
 | 05:00 | mert-pp (spec_ab + per_product) | PUB-12, PUB-13 | 2/2 | ürün başına kayıt transcript'te doğrulandı |
+| 10:34 | prova-f8 (temiz klon, LLM) | teslim provası A+B | lint 0, 109 sn, $1.00 | export + trace doğru; specdiff altın spec'e 0 PUAN farkı |
+| 10:39–10:45 | dev-b / var-pp / var-cc | `fbb scenarios` SC-01..05 (ilk tur) | SC-01 ✅, SC-02 ✅, SC-03 ❌, SC-04 ❌, SC-05 ❌ | SC-03: model aynı turda `next_offer` + `propose_results` → p1 kayboldu, `negotiate_more` `go_more` ile 70 kez kendine döndü. SC-04: mock `no_promise/callback`'i reddetti (varyant spec hatası). SC-05: gün söylenince model saat sordu |
+| 10:53–10:56 | düzeltmeler (fold, go_more, gün-tek) | SC-01..05 | SC-01..04 ✅, SC-05 ❌ | SC-05: callback node'u müşterinin söylediği zamanı tekrar sordu → açılış onay sorusuna çevrildi |
+| 10:58 | dev-b (fold sürümü) | Brief B ×1 | **3/3** | |
 | 00:40 | dev-a-llm / dev-b-llm | Claude ile tam build (A, A+B) + `specdiff` | lint 0; PUAN farkı A 0, B 1 | B: `hangup_unverified` farkı (brief tanımlamıyor) |
 | 00:42 | dev-a-llm | Brief A × 3 | 9/10 | PUB-05 2/3: `propose_results` öncesi teselli tekrarı → texts kuralı |
 | 00:52 | dev-b-llm | Brief B × 3 | **3/3 pass³** | |

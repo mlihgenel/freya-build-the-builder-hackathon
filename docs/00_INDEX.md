@@ -38,7 +38,7 @@ uv run fbb chat brief-a "Hello?" --case PUB-01                                  
 | `src/fbb/build.py`, `cli.py`, `trace.py`, `kitapi.py` | 03, 09 |
 | `tests/` | 06 |
 
-## Durum (10 Ekim 2026, ~20:35 TR)
+## Durum (11 Ekim 2026, ~10:30 TR; ayrıntı ve sıradaki adımlar `13_FINAL_HAZIRLIK.md`)
 - `11_REVIEW.md`'deki düzeltmeler uygulandı (madde madde durum: `11_REVIEW.md` §F). Özet:
   - close_call: kapanış node'larında + müşteri kapatırsa lifecycle yedeği; erken outcome yazımı; retries 2.
   - Read-back/onay kodda (`propose_results` → `readback`); geçersiz teklif tts ile söylenir.

@@ -13,10 +13,10 @@
 | F3b | Brief A simülasyonu | A tek çalışmada ≥ 9/10, iki kez | ✅ `--reps 3` 10/10 pass³, iki ayrı koşuda (11 Eki 00:15, next_offer sürümü, altın spec) |
 | R1 | Review düzeltmeleri (`11_REVIEW.md` C.1–C.6) | testler yeşil, L1/L2 temiz | ✅ kod + test (10 Eki 20:35); L4 ölçümü bekliyor |
 | F4 | Brief B | 13/13 bir kez, `--reps 3` ile ≥ 11/13 | ✅ public 3 vaka `--reps 3` 3/3 pass³ (11 Eki 00:10) |
-| F6 | varyant provası (C/D/E), G-01 cevap alanı eşlemesi | çökme yok, ≥ %80 | 🟡 G-01 ✅, varyant openapi birim testi ✅ (`test_variant_openapi_does_not_crash`); ham materyal provası C (LLM, `--no-deploy`) ✅ lint 0; simülasyon provası yok |
-| F7 | stiller + 3 tekrar | bilinmeyen sebeple 3/3 altında vaka yok | ⏳ next_offer sürümüyle stiller ölçülmedi; LLM tam build (floor_note çıkarımı) da denenmedi |
+| F6 | varyant provası (C/D/E), G-01 cevap alanı eşlemesi | çökme yok, ≥ %80 | 🟡 (13 Faz 5'e bağlı) G-01 ✅, varyant openapi birim testi ✅ (`test_variant_openapi_does_not_crash`); ham materyal provası C (LLM, `--no-deploy`) ✅ lint 0; simülasyon provası yok |
+| F7 | stiller + 3 tekrar | bilinmeyen sebeple 3/3 altında vaka yok | 🟡 5 stil × A/B ölçüldü, düzeltmelerden sonra talkative A 10/10 · B 3/3, düşen vakalar hedefli 3/3 (11 Eki 05:00, `14_RAPOR_11EKIM.md`). pieces/in_words/asks_back/corrects son sürümle bütün brief olarak koşulmadı (13 Adım 6) |
 | F5b | LLM spec'iyle uçtan uca (finaldeki zincir) | A ≥ 9/10, B 3/3 pass³; çıkarımlar arası puan farkı yok | ✅ A 10/10, B 3/3; 3 çıkarım 0 fark (11 Eki 01:45) |
-| F8 | teslim provası: temiz kopyadan 2 brief art arda | tek komut, brief başına ≤ 10 dk | |
+| F8 | teslim provası: temiz kopyadan 2 brief art arda | tek komut, brief başına ≤ 10 dk | ✅ 11 Eki 10:34: temiz klon, A+B 109 sn / $1.00, lint 0, geri okuma 0 fark, export + trace doğru (13 §6.2) |
 | — | **Özellik dondurma: Pazar 18:00 TR** | | |
 
 ## Final penceresi (Pazar 20:00–23:00 TR)
@@ -32,7 +32,15 @@
    ```bash
    uv run build-agent final/<x>/brief.md --tools final/<x>/openapi.json --slot final-<x>
    ```
-   Kontrol: trace'te `lint 0`, `cross_check` boş, `unmapped` mantıklı, export yazılmış.
+   Kontrol: trace'te `lint 0`, `cross_check` boş, `unmapped` mantıklı, export yazılmış. `warnings`'te "workflow büyük"
+   uyarısı build'i durdurmaz (dryRun 1,2 MB'ı kabul etti).
+   Aynı anda ikinci bir çıkarım (deploy yok, ~2 dk, ~$0.5) ve karşılaştırma:
+   ```bash
+   uv run build-agent final/<x>/brief.md --tools final/<x>/openapi.json --slot chk-<x> --no-deploy
+   uv run fbb specdiff out/chk-<x>.spec.json out/final-<x>.spec.json
+   ```
+   PUAN farkı varsa iki değerden hangisinin brief'e uyduğuna bakılır. Asıl spec yanlışsa genel bir prompt düzeltmesi
+   yapılıp build tekrarlanır (BUGFIX_LOG). 11 Eki provası: C ve D'de iki çıkarım 0 PUAN farkı.
 4. **20:15** Ham materyal brief'i: bütün dosyalar sırayla verilir (mail, poliçe, memo, kod listesi; ilgili sırayla).
 5. **20:30** Gözle kontrol:
    - `out/<slot>.spec.json`: tatiller, bantlar, kimlik soruları, outcome tablosu brief'le aynı mı?
@@ -42,7 +50,9 @@
    ```bash
    uv run fbb chat final-<x> "Hello?" --case PUB-01
    ```
-   Açılışın ve ilk turun çalıştığı görülmeli.
+   İlk turların (kimlik soruları, hata yolunda dürüst cümle) çalıştığı görülmeli. **Not:** chat'te açılış tts'i
+   söylenmez, ilk cevabı model üretir ve cümle atlayabilir (02). Açılışın birebir söylendiğini görmek için tek vakalık
+   bir simülasyon (`fbb cases final-<x> --only PUB-02`) transcript'ine bakılır; ledger'ın düşmesi beklenir (kodlar farklı).
 7. **21:30** `exports/` + `traces/` → kullanıcı commit ve push yapar → commit hash → form gönderilir (bkz. 09).
 8. **22:30** Son güvenli teslim anı.
 
@@ -52,4 +62,5 @@
 | Claude girişi ya da kotası sorun çıkarırsa | `ANTHROPIC_API_KEY` ile tekrar dene; `BUILDER_MODEL=claude-sonnet-5-5` |
 | Lint hatası (beklenmeyen tablo ya da alan) | Hata genel bir bug ise düzelt ve kaydet. Spec alanı eksikse prompt'u genel olarak düzelt |
 | Freya 5xx ya da `1010` | Tekrar dene. `User-Agent`'ı `freya.py` ayarlıyor |
+| Mock'a erişilemiyor (timeout, DNS) | VPN aç; olmazsa DNS 1.1.1.1; olmazsa telefondan hotspot. Kontrol: `curl -s -o /dev/null -w '%{http_code}' https://freya-bank-mock.freyavoice.workers.dev/v1/practice/sessions` (401 = erişim var) |
 | Platform workflow'un bir kısmını sildiyse | Trace'teki `freya_readback` farkına bak, `02`'yi güncelle |
