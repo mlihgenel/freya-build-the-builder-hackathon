@@ -394,7 +394,7 @@ def test_every_code_node_has_failure_guard(cat):
     wf = build_workflow(spec("spec_ab.json"), cat)
     for name, node in wf["nodes"].items():
         if node["node_type"] == "code":
-            targets = [t["target_node"] for t in node["transitions"][:2]]
+            targets = [t["target_node"] for t in node["transitions"] if t["target_node"] != "fallback_promise"][:2]
             assert targets == ["fallback_close_nr", "fallback_close"], name
     fb = wf["nodes"]["fallback_close"]
     assert fb["node_type"] == "api_request" and "{{last_name}}" not in fb["on_enter"]["text"]
@@ -820,9 +820,9 @@ def test_every_code_node_has_service_failure_exit(name, s, case, cat):
     for k, x in wf["nodes"].items():
         if x["node_type"] != "code":
             continue
-        heads = [t for t in x["transitions"][:2] if f"{k}_failure_count" in json.dumps(t["condition"])]
+        heads = [t for t in x["transitions"][:5] if f"{k}_failure_count" in json.dumps(t["condition"])]
         assert heads, f"{k}: kod servisi hatası geçişi yok"
-        assert {t["target_node"] for t in heads} <= {"fallback_close", "fallback_close_nr"}
+        assert {t["target_node"] for t in heads} <= {"fallback_close", "fallback_close_nr", "fallback_promise"}
         v = {f"{k}_failure_count": 1}
         assert _route(x, v) == "fallback_close"
         v["close_kind"] = "noreason"
@@ -1219,3 +1219,17 @@ def test_status_sentence_is_said_by_the_system(cat, public_cases):
     assert _propose(n, v, "p1:paid") == "send_close_nr"
     paid = [x.say for x in s.statuses if x.id == "paid"][0]
     assert v["closing_speech"].startswith(paid) and v["closing_speech"].count(paid) == 1
+
+
+def test_code_failure_right_after_recorded_promise_closes_as_promise(cat):
+    """11 Eki A-LLM PUB-04: create_promise ok, ardından rec_step'te kod servisi düştü → outcome 'refused' gitti.
+    Son kayıt başarılıysa kodsuz promise kapanışı."""
+    s = spec("spec_a.json")
+    n = build_workflow(s, cat)["nodes"]
+    v = {"rec_step_failure_count": 1, "rec_r_ok": "true", "close_kind": "reason"}
+    assert _route(n["rec_step"], v) == "fallback_promise"
+    fb = n["fallback_promise"]
+    assert _body(fb)["outcome"]["default"] == "promise" and "reason" not in _body(fb)
+    assert fb["on_enter"]["text"].startswith(s.recording.success_sentence)
+    assert _route(n["rec_step"], {"rec_step_failure_count": 1, "rec_r_ok": "", "close_kind": "reason"}) == \
+        "fallback_close"

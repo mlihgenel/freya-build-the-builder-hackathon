@@ -23,6 +23,7 @@ from fbb.workflow.nodes import (
     end_call,
     intent,
     tool_transition,
+    when_all,
     when_eq,
 )
 from fbb.workflow.nodes import code as _code
@@ -357,6 +358,15 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
                                           on_enter=one_moment, first_entry_only=True)
     nodes["rec_step"] = code("rec_step", snip("after_record_step(vars, RT)", "vars['next_step'] = 'end_r'"), loop,
                              SEND)
+    # Kod servisi, bankanın promise'i kaydettiği anda düşerse rec_step outcome'u güncelleyemez; eski yedek outcome
+    # (ör. refused) gider ve kayıt cümlesi söylenmez (11 Eki, A-LLM PUB-04). Son kayıt başarılıysa kodsuz bir
+    # promise kapanışına gidilir: brief'in başarı cümlesi + veda, promise outcome'u.
+    nodes["rec_step"]["transitions"][:0] = [
+        when_all("fallback_promise", "code service failed right after a recorded promise",
+                 ("rec_step_failure_count", "greater_than", 0), ("rec_r_ok", "equals", v)) for v in OK]
+    c_ = spec.closing
+    nodes["fallback_promise"] = static_close("fallback_promise", c_.promise_outcome, c_.promise_reason,
+                                             spec.recording.success_sentence, False)
     if cat.has("add_note"):
         note_call = call("add_note", {"customer_id": cid, "product_id": "{{note_pid}}", "reason": "{{note_reason}}"},
                          retries=1)
