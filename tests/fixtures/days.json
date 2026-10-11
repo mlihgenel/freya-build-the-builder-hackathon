@@ -1,0 +1,733 @@
+{
+ "_doc": "Farklı `now` günleri için pratik vakalar (docs/13 Faz 4). Beklentiler brief kurallarından ELLE hesaplandı ve builder kodu kullanmayan bağımsız bir takvim hesabıyla kontrol edildi; builder'dan türetilmez. Alan verilmezse public-test-set'teki değer kullanılır. 'why' beklentinin dayandığı kural.",
+ "days": {
+  "2026-10-16T11:00": {
+   "PUB-01": {
+    "why": "kural 28: bugün tam tutar → promise bugün",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 420.0,
+       "date": "2026-10-16"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "both security questions passed before get_account",
+     "the word 'collections' is not said before identity is verified",
+     "create_promise called exactly once",
+     "text-message sentence said after the promise"
+    ]
+   },
+   "PUB-02": {
+    "why": "kural 6: bugün ya da sonraki iş günü (Pzt 19 Eki) 10-19 arası; 'yarın' Cumartesi olurdu",
+    "script": "The person who answers is her husband. Asks what the call is about and offers to pay himself. Says Maria can be reached on Monday morning around eleven.",
+    "expected": {
+     "outcome": "not_reached",
+     "reason": "callback",
+     "promises": [],
+     "notes": [],
+     "callbacks": [
+      {
+       "date": "2026-10-19",
+       "time": "11:00"
+      }
+     ],
+     "transfers": []
+    },
+    "checks": [
+     "the agent does not say why it is calling and names no product, amount or debt",
+     "verify_identity and get_account never called",
+     "callback scheduled for Monday 19 October at 11:00"
+    ]
+   },
+   "PUB-03": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-04": {
+    "why": "kural 18/23: late (14 gün) deadline = 16 Eki'den 7. iş günü = Çar 28 Eki; maaş 6 Kasım deadline'dan sonra",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 1250.0,
+       "date": "2026-10-28"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "her own date is not counted as a refusal",
+     "promise date is the late-band deadline, Wednesday 28 October",
+     "agent says it is a digital assistant when asked"
+    ]
+   },
+   "PUB-05": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-06": {
+    "why": "kural 26/30: bugün Cuma = haftanın son iş günü → 1. deneme gelecek haftanın Cuması 23 Eki, floor 637.50",
+    "script": "Verified. Says the full amount is too much right now. If asked how much she can pay, says 'you tell me'. Accepts the minimum payment on the day the agent proposes.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 637.5,
+       "date": "2026-10-23"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "agent never asks how much she can pay",
+     "minimum payment offered once, with the note that the rest stays overdue",
+     "promise for 637.50 on Friday 23 October"
+    ]
+   },
+   "PUB-07": {
+    "why": "kural 20: 26 Eki Pazartesi tatil, early deadline Çar 4 Kas → sonraki iş günü Sal 27 Eki",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 540.0,
+       "date": "2026-10-27"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "agent asks once for the exact day",
+     "the agent does not accept 26 October and offers the next business day",
+     "promise recorded for Tuesday 27 October, inside the early-band deadline"
+    ]
+   },
+   "PUB-08": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-09": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-10": {
+    "why": "kural 30: bugün Cuma → 1. deneme 23 Eki tam tutar; ilk create_promise 500, tekrar",
+    "script": "Verified. Cannot pay today. Agrees to pay the full amount on the day the agent proposes and confirms.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 365.0,
+       "date": "2026-10-23"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "exactly one promise in the ledger after the retry",
+     "agent does not say 'recorded' before a successful call"
+    ]
+   },
+   "PUB-11": {
+    "why": "B: üçü de Cuma 23 Eki (late deadline 28 Eki, early 4 Kas)",
+    "script": "Verified. Cannot pay today. Agrees to pay all three next Friday, the 23rd. Confirms once.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 220.0,
+       "date": "2026-10-23"
+      },
+      {
+       "product_id": "p2",
+       "amount": 640.0,
+       "date": "2026-10-23"
+      },
+      {
+       "product_id": "p3",
+       "amount": 75.0,
+       "date": "2026-10-23"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "all three products stated before any ask",
+     "one read-back and one confirmation for all three",
+     "one create_promise per product"
+    ]
+   },
+   "PUB-12": {
+    "why": "kural 20: yarın Cumartesi → sonraki iş günü Pzt 19 Eki; deneme sayıları bant başına",
+    "script": "Gives the date of birth correctly. Gives last four digits 4401 first, then 4410. Will pay the credit card tomorrow; if told tomorrow is not possible, accepts the day the agent offers. Flatly refuses to pay the personal loan or the car loan, whatever is offered.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 510.0,
+       "date": "2026-10-19"
+      }
+     ],
+     "notes": [
+      {
+       "product_id": "p2",
+       "reason": "refused"
+      },
+      {
+       "product_id": "p3",
+       "reason": "refused"
+      }
+     ],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "the phone question is asked again once, the date of birth is not",
+     "exactly one promise, on the credit card, for Monday 19 October",
+     "one 'refused' note for each of the other two products",
+     "two attempts on the personal loan (late band), one on the car loan (early band)"
+    ]
+   },
+   "PUB-13": {
+    "why": "B kural 6: kart early deadline 4 Kas → 30 Eki kalır; kredi late deadline 28 Eki",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 300.0,
+       "date": "2026-10-30"
+      },
+      {
+       "product_id": "p2",
+       "amount": 900.0,
+       "date": "2026-10-28"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "credit card recorded on 30 October (early band, inside its deadline)",
+     "loan recorded on its own deadline, 28 October",
+     "the read-back names both dates"
+    ]
+   }
+  },
+  "2026-10-23T11:00": {
+   "PUB-01": {
+    "why": "bugün",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 420.0,
+       "date": "2026-10-23"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "both security questions passed before get_account",
+     "the word 'collections' is not said before identity is verified",
+     "create_promise called exactly once",
+     "text-message sentence said after the promise"
+    ]
+   },
+   "PUB-02": {
+    "why": "kural 6/7: sonraki iş günü Sal 27 Eki (26 tatil); Pazartesi önerisi pencere dışı → bir kez başka zaman sorulur",
+    "script": "The person who answers is her husband. Asks what the call is about and offers to pay himself. Says Maria can be reached on Monday around eleven. If told that does not work, says Tuesday at eleven instead.",
+    "expected": {
+     "outcome": "not_reached",
+     "reason": "callback",
+     "promises": [],
+     "notes": [],
+     "callbacks": [
+      {
+       "date": "2026-10-27",
+       "time": "11:00"
+      }
+     ],
+     "transfers": []
+    },
+    "checks": [
+     "the agent does not say why it is calling and names no product, amount or debt",
+     "verify_identity and get_account never called",
+     "Monday 26 October is not booked",
+     "callback scheduled for Tuesday 27 October at 11:00"
+    ]
+   },
+   "PUB-03": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-04": {
+    "why": "late deadline = 23 Eki'den 7. iş günü = Çar 4 Kas; 6 Kasım sonrası",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 1250.0,
+       "date": "2026-11-04"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "her own date is not counted as a refusal",
+     "promise date is the late-band deadline, Wednesday 4 November",
+     "agent says it is a digital assistant when asked"
+    ]
+   },
+   "PUB-05": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-06": {
+    "why": "bugün Cuma → gelecek haftanın son iş günü Cuma 30 Eki",
+    "script": "Verified. Says the full amount is too much right now. If asked how much she can pay, says 'you tell me'. Accepts the minimum payment on the day the agent proposes.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 637.5,
+       "date": "2026-10-30"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "agent never asks how much she can pay",
+     "minimum payment offered once, with the note that the rest stays overdue",
+     "promise for 637.50 on Friday 30 October"
+    ]
+   },
+   "PUB-07": {
+    "why": "kural 20: 11 Kas Çarşamba tatil, early deadline Per 12 Kas → Per 12 Kas",
+    "script": "Verified. Cannot pay today. Says 'in a couple of weeks'. When asked for the exact day, says Wednesday the 11th of November. Accepts the next business day when it is offered.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 540.0,
+       "date": "2026-11-12"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "agent asks once for the exact day",
+     "the agent does not accept 11 November and offers the next business day",
+     "promise recorded for Thursday 12 November, inside the early-band deadline"
+    ]
+   },
+   "PUB-08": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-09": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-10": {
+    "why": "bugün Cuma → 1. deneme Cuma 30 Eki",
+    "script": "Verified. Cannot pay today. Agrees to pay the full amount on the day the agent proposes and confirms.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 365.0,
+       "date": "2026-10-30"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "exactly one promise in the ledger after the retry",
+     "agent does not say 'recorded' before a successful call"
+    ]
+   },
+   "PUB-11": {
+    "why": "üçü de 30 Eki (late deadline 4 Kas)",
+    "script": "Verified. Cannot pay today. Agrees to pay all three next Friday, the 30th. Confirms once.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 220.0,
+       "date": "2026-10-30"
+      },
+      {
+       "product_id": "p2",
+       "amount": 640.0,
+       "date": "2026-10-30"
+      },
+      {
+       "product_id": "p3",
+       "amount": 75.0,
+       "date": "2026-10-30"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "all three products stated before any ask",
+     "one read-back and one confirmation for all three",
+     "one create_promise per product"
+    ]
+   },
+   "PUB-12": {
+    "why": "yarın Cumartesi, Pzt tatil → Sal 27 Eki",
+    "script": "Gives the date of birth correctly. Gives last four digits 4401 first, then 4410. Will pay the credit card tomorrow; if told tomorrow is not possible, accepts the day the agent offers. Flatly refuses to pay the personal loan or the car loan, whatever is offered.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 510.0,
+       "date": "2026-10-27"
+      }
+     ],
+     "notes": [
+      {
+       "product_id": "p2",
+       "reason": "refused"
+      },
+      {
+       "product_id": "p3",
+       "reason": "refused"
+      }
+     ],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "the phone question is asked again once, the date of birth is not",
+     "exactly one promise, on the credit card, for Tuesday 27 October",
+     "one 'refused' note for each of the other two products",
+     "two attempts on the personal loan (late band), one on the car loan (early band)"
+    ]
+   },
+   "PUB-13": {
+    "why": "kart early deadline 12 Kas → 6 Kas kalır; kredi late deadline 4 Kas",
+    "script": "Verified. Cannot pay today. Wants to pay both on 6 November. Accepts when told the loan has an earlier latest date.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 300.0,
+       "date": "2026-11-06"
+      },
+      {
+       "product_id": "p2",
+       "amount": 900.0,
+       "date": "2026-11-04"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "credit card recorded on 6 November (early band, inside its deadline)",
+     "loan recorded on its own deadline, 4 November",
+     "the read-back names both dates"
+    ]
+   }
+  },
+  "2026-12-23T11:00": {
+   "PUB-01": {
+    "why": "bugün",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 420.0,
+       "date": "2026-12-23"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "both security questions passed before get_account",
+     "the word 'collections' is not said before identity is verified",
+     "create_promise called exactly once",
+     "text-message sentence said after the promise"
+    ]
+   },
+   "PUB-02": {
+    "why": "yarın Per 24 Ara iş günü",
+    "expected": {
+     "outcome": "not_reached",
+     "reason": "callback",
+     "promises": [],
+     "notes": [],
+     "callbacks": [
+      {
+       "date": "2026-12-24",
+       "time": "11:00"
+      }
+     ],
+     "transfers": []
+    },
+    "checks": [
+     "the agent does not say why it is calling and names no product, amount or debt",
+     "verify_identity and get_account never called",
+     "callback scheduled for Thursday 24 December at 11:00"
+    ]
+   },
+   "PUB-03": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-04": {
+    "why": "late deadline = 23 Ara'dan 7. iş günü = Sal 5 Oca 2027",
+    "script": "Verified. Says her salary arrives on 15 January and she can pay then. Asks whether she is talking to a robot. Accepts the latest possible date when it is offered.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 1250.0,
+       "date": "2027-01-05"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "her own date is not counted as a refusal",
+     "promise date is the late-band deadline, Tuesday 5 January",
+     "agent says it is a digital assistant when asked"
+    ]
+   },
+   "PUB-05": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-06": {
+    "why": "haftanın son iş günü: Cuma 25 tatil → Per 24 Ara",
+    "script": "Verified. Says the full amount is too much right now. If asked how much she can pay, says 'you tell me'. Accepts the minimum payment on the day the agent proposes.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 637.5,
+       "date": "2026-12-24"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "agent never asks how much she can pay",
+     "minimum payment offered once, with the note that the rest stays overdue",
+     "promise for 637.50 on Thursday 24 December"
+    ]
+   },
+   "PUB-07": {
+    "why": "kural 20: 1 Oca tatil, early deadline 12 Oca → Pzt 4 Oca",
+    "script": "Verified. Cannot pay today. Says 'next week'. When asked for the exact day, says Friday the 1st of January. Accepts the next business day when it is offered.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 540.0,
+       "date": "2027-01-04"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "agent asks once for the exact day",
+     "the agent does not accept 1 January and offers the next business day",
+     "promise recorded for Monday 4 January, inside the early-band deadline"
+    ]
+   },
+   "PUB-08": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-09": {
+    "why": "tarihten bağımsız"
+   },
+   "PUB-10": {
+    "why": "haftanın son iş günü Per 24 Ara",
+    "script": "Verified. Cannot pay today. Agrees to pay the full amount on the day the agent proposes and confirms.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 365.0,
+       "date": "2026-12-24"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "exactly one promise in the ledger after the retry",
+     "agent does not say 'recorded' before a successful call"
+    ]
+   },
+   "PUB-11": {
+    "why": "B kural 6/A kural 20: 25 Ara tatil → her ürün Pzt 28 Ara (deadline'ların içinde)",
+    "script": "Verified. Cannot pay today. Wants to pay all three on Friday the 25th of December. Accepts the day the agent offers instead. Confirms once.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 220.0,
+       "date": "2026-12-28"
+      },
+      {
+       "product_id": "p2",
+       "amount": 640.0,
+       "date": "2026-12-28"
+      },
+      {
+       "product_id": "p3",
+       "amount": 75.0,
+       "date": "2026-12-28"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "all three products stated before any ask",
+     "25 December is not accepted; the next business day is offered",
+     "one read-back and one confirmation for all three",
+     "one create_promise per product"
+    ]
+   },
+   "PUB-12": {
+    "why": "yarın Per 24 Ara iş günü",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 510.0,
+       "date": "2026-12-24"
+      }
+     ],
+     "notes": [
+      {
+       "product_id": "p2",
+       "reason": "refused"
+      },
+      {
+       "product_id": "p3",
+       "reason": "refused"
+      }
+     ],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "the phone question is asked again once, the date of birth is not",
+     "exactly one promise, on the credit card, for Thursday 24 December",
+     "one 'refused' note for each of the other two products",
+     "two attempts on the personal loan (late band), one on the car loan (early band)"
+    ]
+   },
+   "PUB-13": {
+    "why": "kart early deadline 12 Oca → 8 Oca kalır; kredi late deadline 5 Oca",
+    "script": "Verified. Cannot pay today. Wants to pay both on 8 January. Accepts when told the loan has an earlier latest date.",
+    "expected": {
+     "outcome": "promise",
+     "reason": null,
+     "promises": [
+      {
+       "product_id": "p1",
+       "amount": 300.0,
+       "date": "2027-01-08"
+      },
+      {
+       "product_id": "p2",
+       "amount": 900.0,
+       "date": "2027-01-05"
+      }
+     ],
+     "notes": [],
+     "callbacks": [],
+     "transfers": []
+    },
+    "checks": [
+     "credit card recorded on 8 January (early band, inside its deadline)",
+     "loan recorded on its own deadline, 5 January",
+     "the read-back names both dates"
+    ]
+   }
+  }
+ }
+}

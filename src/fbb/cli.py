@@ -6,6 +6,7 @@
     uv run fbb cases <agent_id> --brief A [--reps 3] [--style pieces]
     uv run fbb chat <slot> "Hello?" --case PUB-01
     uv run fbb specdiff out/<slot>.spec.json tests/fixtures/spec_a.json
+    uv run fbb days <slot> --now 2026-10-16T11:00 --brief A [--reps 3] [--style pieces]
 """
 from __future__ import annotations
 
@@ -68,6 +69,9 @@ def main(argv: list[str] | None = None) -> None:
     d.add_argument("spec", help="incelenen spec (ör. out/<slot>.spec.json)")
     d.add_argument("reference", help="referans spec (ör. tests/fixtures/spec_a.json)")
     d.add_argument("--info", action="store_true", help="BİLGİ düzeyindeki farkları da yaz")
+    from fbb import days
+
+    days.main_args(sub)
     a = ap.parse_args(argv)
     if a.cmd == "specdiff":
         from fbb.specdiff import report
@@ -77,6 +81,9 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1 if n_score else 0)
     from fbb import kitapi
 
+    if a.cmd == "days":
+        days.run_days(kitapi.agent_for(a.agent_id), a.now, brief=a.brief, only=a.only, style=a.style, reps=a.reps)
+        return
     if a.cmd == "call":
         print_call(kitapi.get_call(a.call_id), show_all=a.all)
         return

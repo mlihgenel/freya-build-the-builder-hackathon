@@ -6,6 +6,7 @@ env.sh
 # kit ve Freya yerel durumu
 .freya-agents.json
 kit/.personas.json
+.personas-days.json
 kit/results/
 kit/traces/
 .personas.json
