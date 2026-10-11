@@ -1122,3 +1122,63 @@ def test_request_fields_noop_on_kit_openapi(cat):
     from fbb.spec import resolve_request_fields
     s = spec("spec_ab.json")
     assert resolve_request_fields(s, cat) == [] and s.tool_fields == spec("spec_ab.json").tool_fields
+
+
+def test_callback_min_lead_minutes(cat):
+    """Brief F (11 Eki): 'aynı gün en az 2 saat sonra' → 12:30 reddedilir, 13:00 kabul; pencere metni söyler."""
+    s = spec("spec_a.json")
+    s.third_party.callback.min_lead_minutes = 120
+    n = build_workflow(s, cat)["nodes"]
+    v = {"now": "2026-10-14T11:00"}
+    run_snippet(_code_of(n["third_party"]), vars=v)
+    assert "Today only from 13:00" in v["cb_facts"]
+    v.update({"check_callback_time_args.date": "2026-10-14", "check_callback_time_args.time": "12:30"})
+    run_snippet(_tool_code(n["third_party_talk"], "check_callback_time"), vars=v)
+    assert v["cb_state"] == "invalid" and "not before 13:00" in v["cb_msg"]
+    run_snippet(_code_of(n["third_party_fix"]), vars=v)
+    v.update({"check_callback_time_args.date": "2026-10-14", "check_callback_time_args.time": "13:00"})
+    run_snippet(_tool_code(n["third_party_retry"], "check_callback_time"), vars=v)
+    assert v["cb_state"] == "ok"
+
+
+def _close_of(n, v):
+    run_snippet(_code_of(n["close_final"]), vars=v)
+    return v["close_outcome"], v["close_reason"], v["close_kind"]
+
+
+def test_promise_and_paid_reasons(cat, public_cases):
+    """Brief F: promise kapanışı da reason alır; kaydedilenlerden biri kısmiyse 'kısmi' reason; ödemiş → kendi reason'ı.
+    Alanlar boşsa (A/B) promise reason'sız kalır."""
+    s = spec("spec_ab.json")
+    s.closing.promise_reason, s.closing.promise_reason_partial, s.closing.paid_reason = "P01", "P02", "A07"
+    s.closing.no_reason_outcomes = []
+    n = build_workflow(s, cat)["nodes"]
+    v = {}
+    plans = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    v["recorded_json"] = json.dumps([{"product_id": "p1", "amount": plans[0]["past_due"], "date": "2026-10-15"}])
+    v["promises_ok"] = "1"
+    assert _close_of(n, dict(v))[:2] == ("promise", "P01")
+    v["recorded_json"] = json.dumps([{"product_id": "p1", "amount": plans[0]["floor"], "date": "2026-10-15"}])
+    o, r, kind = _close_of(n, dict(v))
+    assert (o, r, kind) == ("promise", "P02", "reason")
+    w = {k: x for k, x in v.items() if k not in ("recorded_json", "promises_ok")}
+    w["statuses_json"] = json.dumps([{"product_id": p["product_id"], "reason": "paid"} for p in plans])
+    assert _close_of(n, w)[:2] == ("paid", "A07")
+    base = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v2 = {}
+    _account(base, v2, public_cases["PUB-12"], "spec_ab")
+    v2.update({"recorded_json": v["recorded_json"], "promises_ok": "1"})
+    assert _close_of(base, v2) == ("promise", "", "noreason")
+
+
+@pytest.mark.parametrize("k", ["c", "d", "e", "f"])
+def test_rehearsal_briefs_build_cleanly(k):
+    """Prova brief'leri (C/D/E/F, tests/fixtures/variants): beklenen spec + kendi openapi'si → cross_check boş, lint 0."""
+    from fbb.spec import resolve_request_fields
+    vcat = load_catalog(FIX / "variants" / f"openapi_{k}.json")
+    s = PolicySpec.model_validate(json.loads((FIX / "variants" / f"spec_{k}_expected.json").read_text()))
+    resolve_response_fields(s, vcat)
+    resolve_request_fields(s, vcat)
+    assert cross_check(s, vcat) == []
+    wf = build_workflow(s, vcat)
+    assert _lint(wf, s, vcat) == []

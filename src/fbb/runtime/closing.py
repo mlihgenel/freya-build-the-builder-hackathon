@@ -28,6 +28,20 @@ def transfer_queue_of(vars, RT):
     return ""
 
 
+def promise_reason(vars, c):
+    """Promise kapanışının reason'ı (brief istiyorsa): kaydedilen tutarlardan biri tam borçtan azsa 'kısmi' reason."""
+    partial = c.get("promise_reason_partial", "")
+    if partial:
+        try:
+            due = dict((p["product_id"], float(p["past_due"])) for p in json.loads(vars.get("plans_json") or "[]"))
+            recorded = json.loads(vars.get("recorded_json") or "[]")
+        except Exception:
+            due, recorded = dict(), []
+        if any(float(r.get("amount", 0)) < due.get(r.get("product_id"), 0) - 0.005 for r in recorded):
+            return partial
+    return c.get("promise_reason", "")
+
+
 def decide_close(vars, RT):
     """Dönüş: (outcome, reason). reason '' ise close_call'a hiç gönderilmez."""
     c = RT["closing"]
@@ -35,7 +49,7 @@ def decide_close(vars, RT):
     if queue:
         return c["transfer_outcome"], c.get("transfer_reasons", dict()).get(queue, queue)
     if as_int(vars.get("promises_ok")) > 0:
-        return c["promise_outcome"], ""
+        return c["promise_outcome"], promise_reason(vars, c)
     explicit = str(vars.get("close_fixed_outcome") or "")
     if explicit:
         return explicit, str(vars.get("close_fixed_reason") or "")
@@ -46,7 +60,7 @@ def decide_close(vars, RT):
     if statuses:
         paid = c.get("paid_status", "paid")
         if all(s.get("reason") == paid for s in statuses):
-            return c["paid_outcome"], ""
+            return c["paid_outcome"], c.get("paid_reason", "")
         for s in statuses:
             if s.get("reason") != paid:
                 return c["no_promise_outcome"], c.get("status_to_reason", dict()).get(s["reason"], s["reason"])

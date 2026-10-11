@@ -172,4 +172,9 @@ def check_callback(vars, date_text, time_text, RT):
         return False, "the time is outside " + start_t + "-" + end_t
     if cb.get("after_now", True) and when == today.isoformat() and minutes <= now_min:
         return False, "the time is not later than now"
+    lead = as_int(cb.get("min_lead_minutes"))
+    if lead and when == today.isoformat() and minutes < now_min + lead:
+        first = now_min + lead
+        return False, ("on the same day the time must be at least " + str(lead) + " minutes after now (not before "
+                       + "%02d:%02d" % (first // 60 % 24, first % 60) + ")")
     return True, ""

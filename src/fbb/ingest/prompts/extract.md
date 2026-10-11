@@ -32,6 +32,9 @@ How the program uses the spec:
   closing reason is the status of that product.
 - `closing` maps the brief's outcome table: which outcome is used for a recorded promise, for "already paid", for no
   promise, for transfers (queue → reason), and which outcomes take no reason.
+  If the brief gives a reason code for the promise outcome or the already-paid outcome, put it in
+  `closing.promise_reason` / `closing.paid_reason`; if the promise reason depends on whether every recorded amount is
+  the full amount, the full-amount code goes in `promise_reason` and the partial one in `promise_reason_partial`.
 - `transfers`: one entry per situation that hands the call to a person (queue must be a value of the transfer tool).
   `stages`: a request to speak to a person/human is accepted both before identity (`pre_identity`) and after it
   (`post_verify`) unless the brief limits it, because handing the call to a colleague reveals nothing about the

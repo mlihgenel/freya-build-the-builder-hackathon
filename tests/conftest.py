@@ -29,7 +29,7 @@ RT_A = {
                  {"n": 2, "amount": "floor", "date": "deadline", "bands": ["late"]}],
     "money": {"prefix": "", "suffix": "", "always_decimals": False},
     "callback": {"days": ["today", "next_business_day"], "start": "10:00", "end": "19:00", "hours_by_weekday": {},
-                 "inclusive": True, "after_now": True, "retries": 1},
+                 "inclusive": True, "after_now": True, "min_lead_minutes": 0, "retries": 1},
     "confirm_question": "Do you confirm?",
     "recording": {"mode": "batch", "retries": 1, "success_sentence": "You will receive a text message confirming this "
                   "promise.", "failure_sentence": "I am sorry, I could not record your promise.",
@@ -41,6 +41,7 @@ RT_A = {
         "transfer_reasons": {"restructuring": "restructuring", "general": "human", "support": "support"},
         "status_to_reason": {},
         "no_reason_outcomes": ["promise", "paid"],
+        "promise_reason": "", "promise_reason_partial": "", "paid_reason": "",
         "hangup_verified": ["no_promise", "refused"],
         "hangup_unverified": ["not_verified", "declined"],
     },

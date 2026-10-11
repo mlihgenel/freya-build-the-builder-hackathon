@@ -180,6 +180,11 @@ def callback_facts(today, minutes, cb, RT):
             + ". A callback can be booked only on: " + "; ".join(parts)
             + (" (both ends included)" if cb.get("inclusive", True) else " (ends excluded)")
             + (", and only later than now." if cb.get("after_now", True) else "."))
+    lead = as_int(cb.get("min_lead_minutes"))
+    if lead and to_date(today) in days:
+        first = minutes + lead
+        text += (" Today only from " + "%02d:%02d" % (first // 60 % 24, first % 60) + " (at least " + str(lead)
+                 + " minutes after now).")
     return text, days
 
 

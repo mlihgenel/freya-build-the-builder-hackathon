@@ -64,6 +64,8 @@ class Callback(Strict):
         default_factory=dict, description="Saat aralığı güne göre değişiyorsa: '0'..'6' (Pazartesi=0) → {start, end}")
     inclusive: bool = True
     after_now: bool = True
+    min_lead_minutes: int = Field(0, description="Aynı gün callback'i şimdiden en az bu kadar dakika sonra olmalı "
+                                  "(ör. 'en az 2 saat sonra' → 120; 0 = sadece şimdiden sonra)")
     retries: int = Field(1, description="Pencere dışı teklifte kaç kez daha sorulur")
 
     @field_validator("days")
@@ -230,6 +232,10 @@ class Closing(Strict):
     transfer_reasons: dict[str, str] = Field(..., description="queue → kapanış reason")
     status_to_reason: dict[str, str] = Field(default_factory=dict, description="Durum adı farklıysa → kapanış reason")
     no_reason_outcomes: list[str]
+    promise_reason: str = Field("", description="Brief promise kapanışına da reason istiyorsa (boşsa reason yok)")
+    promise_reason_partial: str = Field(
+        "", description="Kaydedilen tutarlardan biri tam borçtan azsa kullanılacak promise reason'ı (boşsa promise_reason)")
+    paid_reason: str = Field("", description="Brief 'ödemiş' kapanışına reason istiyorsa")
     hangup_verified: OutcomeRef
     hangup_unverified: OutcomeRef
     goodbye_sentence: str = Field(..., description="Çağrının son cümlesi: teşekkür ve veda")
@@ -600,6 +606,8 @@ def to_runtime(spec: PolicySpec) -> dict:
             "no_promise_outcome": c.no_promise_outcome, "transfer_outcome": c.transfer_outcome,
             "paid_status": c.paid_status, "transfer_reasons": c.transfer_reasons,
             "status_to_reason": c.status_to_reason, "no_reason_outcomes": c.no_reason_outcomes,
+            "promise_reason": c.promise_reason, "promise_reason_partial": c.promise_reason_partial,
+            "paid_reason": c.paid_reason,
             "hangup_verified": [c.hangup_verified.outcome, c.hangup_verified.reason],
             "hangup_unverified": [c.hangup_unverified.outcome, c.hangup_unverified.reason],
         },

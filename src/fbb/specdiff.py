@@ -67,7 +67,9 @@ def canonical(spec: dict) -> dict:
     s["floor"] = floor
     clo = s.get("closing") or {}
     # kapanış durumu kendi adıyla eşlenir (closing.py: .get(r, r)): kimlik eşlemesi yokla aynıdır
-    clo["status_to_reason"] = {k: v for k, v in (clo.get("status_to_reason") or {}).items() if k != v}
+    # ödenmiş durumu reason'a hiç eşlenmez (decide_close onu atlar; hepsi ödenmişse paid_reason)
+    paid = clo.get("paid_status", "paid")
+    clo["status_to_reason"] = {k: v for k, v in (clo.get("status_to_reason") or {}).items() if k != v and k != paid}
     names = {b2.get("name") for b2 in spec.get("bands") or []}
     for a in (s.get("negotiation") or {}).get("attempts") or []:
         a["bands"] = sorted(a.get("bands") or [])
