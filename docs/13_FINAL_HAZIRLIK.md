@@ -5,7 +5,7 @@
 > - Yarım kalan madde `[~]` ile işaretlenir ve ne kaldığı yazılır.
 > - **"📍 Şu an"** satırı her adımda güncellenir.
 
-**📍 Şu an (11 Eki ~17:30): DONDURULDU.** Faz 0–7 ✅. Son sürüm: altın spec B 3/3 pass³; Claude spec'i B 3/3 pass³, A 7/10 pass³ (3 düşüş: platform sessizliği, robot sorusu zamanlama yarışı, durum cümlesi → düzeltildi: PUB-08 3/3, A-LLM ×1 10/10). Platform 16:20–17:15 arası yavaştı (medyan en yavaş tur 4–61 sn). Bundan sonra sadece bug fix; final penceresi `docs/07`.
+**📍 Şu an (11 Eki ~17:50): DONDURULDU** (17:40 ve 17:50'de iki son düzeltme: kayıttan sonra kod servisi düşerse promise kapanışı; read-back'te soru + onay aynı mesajdaysa önce soru). Faz 0–7 ✅. Son sürüm: altın spec B 3/3 pass³; Claude spec'i B 3/3 pass³, A 7/10 pass³ (3 düşüş: platform sessizliği, robot sorusu zamanlama yarışı, durum cümlesi → düzeltildi: PUB-08 3/3, A-LLM ×1 10/10). Platform 16:20–17:15 arası yavaştı (medyan en yavaş tur 4–61 sn). Bundan sonra sadece bug fix; final penceresi `docs/07`.
 
 **Önceki (14:45):** Freya API kesintide (kimlikli çağrılar 504/403) → Freya'sız işler yapıldı: runtime review + 2 düzeltme (3.14), istek alanı eşlemesi (3.15), Brief E (5.6), runbook kesinti prosedürleri. Ölçülmeyen: `check_offer_answer`, cevaplanmamış soru kuralı ve 3.14 sonrası A/B `--reps 3` (13:00 koşusu platform yüzünden geçersiz). Platform düzelince: slotları kur → A/B `--reps 3` → talkative, SC-01..05 ×1 → Faz 7.
 
@@ -144,6 +144,7 @@ Amaç: finale en yakın testleri koşmak, sorunları **genel** olarak düzeltmek
   - PUB-08: brief'in 'ödemeler bir iş günü içinde görünür' cümlesi söylenmedi. Kök neden: 'propose_results'tan önce konuşma' kuralı ile durum cümlesinin modele bırakılması çakışıyordu. Düzeltme: durumun `say` cümlesini kapanış/ara konuşma söyler (`status_say`, `announce`), görev metni 'sistem söyler' diyor (`test_status_sentence_is_said_by_the_system`). Ölçüm (son kod): PUB-08 A-LLM `--reps 3` **3/3**, A-LLM ×1 **10/10**.
 - [x] 7.3 `docs/00` ve `docs/07` "donduruldu"; commit ve push (11 Eki ~17:30, Mert). Son kod eklemeleri: `fbb cases --rerun-if-slow N` (kitin seçeneği), durum cümlesini sistem söyler. Bundan sonra sadece bug fix (`BUGFIX_LOG.md`)
 - [x] 7.4 (11 Eki 17:30–17:40, Mert, dondurmadan önce) Platform hızlıyken Claude spec'li A `--reps 3`: 6/10 → düşüşlerin hepsi platform (2× 60 sn sessizlik, 2× `Failed to reach snekbox`). Biri bizde zayıflık gösterdi: create_promise başarılı olduktan hemen sonra `rec_step`'te kod servisi düşünce yedek kapanış eski 'refused' outcome'unu gönderdi. Düzeltme: `rec_step` hatası + son kayıt başarılı → kodsuz `fallback_promise` (promise outcome, başarı cümlesi + veda). Test: `test_code_failure_right_after_recorded_promise_closes_as_promise`; dryRun + geri okuma 0 fark
+- [x] 7.5 (11 Eki 17:40–17:48, Mert) Claude spec'li B `--reps 3` **3/3**; talkative A-LLM 8/10: PUB-04'te robot sorusu ikinci kez cevapsız kaldı (tekrar). Kök neden: müşteri soruyu onayla aynı mesajda soruyordu ("…are you a robot? Yes, I confirm."), read-back'teki 'evet' geçişi hemen kayda gidiyordu. Düzeltme: onay geçişi mesajda soru yoksa; soru varsa model cevaplayıp onayı tekrar sorar. Doğrulama: talkative PUB-04 1/1, A-LLM PUB-01/06/10 3/3, B-LLM 3/3. PUB-03 (talkative): sim'in kesik mesaj döngüsü kimlik tur sınırını doldurdu; dokunulmadı
 
 ---
 

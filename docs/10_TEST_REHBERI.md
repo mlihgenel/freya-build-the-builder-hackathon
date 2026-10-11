@@ -258,6 +258,8 @@ staging-app.freyavoice.ai → çağrı kayıtları. Simülasyon çağrıları "S
 | 16:54–17:07 | mert-a-llm / mert-b-llm (Claude spec'i) | A / B `--reps 3` | 7/10 / **3/3** | A: PUB-01 platform (67 sn), PUB-04 robot sorusu tts sırasında (yarış), PUB-08 durum cümlesi söylenmedi → düzeltildi |
 | 17:10–17:15 | son kod (durum cümlesi düzeltmesi) | A-LLM PUB-08 ×3; A-LLM ×1; B ×1 | **3/3**; **10/10**; **3/3** | |
 | 17:30–17:36 | mert-a-llm (platform başta hızlı) | A `--reps 3` | 6/10 | 4 düşüşün hepsi platform: 2× 60 sn sessizlik (müşteri kapattı), 2× `Failed to reach snekbox`. Snekbox kayıttan hemen sonra düşünce outcome 'refused' gitti → `fallback_promise` eklendi |
+| 17:36–17:43 | mert-b-llm / mert-a-llm | B `--reps 3`; talkative A ×1 | **3/3**; 8/10 | talkative: PUB-04 robot sorusu onayla aynı mesajda → read-back düzeltmesi; PUB-03 sim döngüsü |
+| 17:45–17:48 | read-back düzeltmesi | talkative PUB-04; A-LLM PUB-01/06/10; B-LLM ×1 | 1/1; 3/3; **3/3** | |
 | 10:34 | prova-f8 (temiz klon, LLM) | teslim provası A+B | lint 0, 109 sn, $1.00 | export + trace doğru; specdiff altın spec'e 0 PUAN farkı |
 | 10:39–10:45 | dev-b / var-pp / var-cc | `fbb scenarios` SC-01..05 (ilk tur) | SC-01 ✅, SC-02 ✅, SC-03 ❌, SC-04 ❌, SC-05 ❌ | SC-03: model aynı turda `next_offer` + `propose_results` → p1 kayboldu, `negotiate_more` `go_more` ile 70 kez kendine döndü. SC-04: mock `no_promise/callback`'i reddetti (varyant spec hatası). SC-05: gün söylenince model saat sordu |
 | 10:53–10:56 | düzeltmeler (fold, go_more, gün-tek) | SC-01..05 | SC-01..04 ✅, SC-05 ❌ | SC-05: callback node'u müşterinin söylediği zamanı tekrar sordu → açılış onay sorusuna çevrildi |
