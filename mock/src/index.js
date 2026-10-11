@@ -54,6 +54,10 @@ function pick(vals, names) {
 
 function digits(x) { return String(x || "").replace(/\D/g, ""); }
 
+// Panelin "Test API Request" düğmesi değişkenleri doldurmadan gönderir ("{{customerNumber}}"): hata yerine ilk test
+// müşterisinin (ve ilk kartının, ilk haftasının) kaydı döner (paketteki cloudflare-mock/README.md).
+function isTemplate(v) { return typeof v === "string" && (v.startsWith("{{") || v.startsWith("%7B%7B")); }
+
 function byCard(table, card) {
   if (!table || card === undefined) return undefined;
   if (table[card]) return table[card];
@@ -88,17 +92,19 @@ export default {
     // yolda numara olabilir: /customers/90000001/cards
     const pathNums = url.pathname.split("/").filter((s) => /^\d{6,}$/.test(s));
     const customerNo = pick(vals, PARAMS.customer) ?? pathNums[0];
-    const c = CUSTOMERS[digits(customerNo)] || CUSTOMERS[String(customerNo)];
+    const sample = isTemplate(customerNo);
+    const c = sample ? DATA.customers[0] : CUSTOMERS[digits(customerNo)] || CUSTOMERS[String(customerNo)];
     if (!c) return error("FB_IVR_CHANNEL_101", "Müşteri bulunamadı.", 404);
     let entry = c.services[svc];
     if (!entry) return error("FB_IVR_CHANNEL_100", "Servis bu müşteri için tanımlı değil.", 404);
     if (!("http" in entry)) {  // kart numarasıyla anahtarlı
       const card = pick(vals, PARAMS.card) ?? pathNums.find((n) => n !== digits(customerNo));
-      entry = byCard(entry, card);
+      entry = sample || isTemplate(card) ? Object.values(entry)[0] : byCard(entry, card);
       if (!entry) return error("FB_IVR_CHANNEL_103", "Kart bulunamadı.", 404);
       if (!("http" in entry)) {  // hafta ile anahtarlı (statement.week.decide / change)
         const week = pick(vals, PARAMS.week);
-        entry = entry[String(parseInt(week, 10))] ?? entry[String(week)];
+        entry = sample || isTemplate(week) ? Object.values(entry)[0]
+          : entry[String(parseInt(week, 10))] ?? entry[String(week)];
         if (!entry) return error("FB_IVR_CHANNEL_104", "Geçersiz hafta.", 400);
       }
     }
