@@ -36,17 +36,24 @@ uv run build-agent kit/briefs/brief-a.md kit/briefs/brief-b.md --tools kit/tools
 - `traces/<slot>-<zaman>.txt` ve `.jsonl`: build trace'i (**teslim edilir**). Başlangıç/bitiş zamanı, her model çağrısının modeli ve amacı, Freya ID'leri ve self-test'ler burada. Key'ler temizlenmiştir.
 
 Seçenekler:
+- `--slot <ad>`: workflow slot adı (varsayılan: son brief'in adı). Aynı slot aynı workflow'u günceller (200 workflow sınırı).
 - `--no-deploy`: Freya'ya hiçbir şey göndermez, sadece yerel çıktı üretir.
-- `--selftest cases:A`: kitin pratik vakalarıyla test eder.
-- `--spec <dosya>`: LLM adımını atlar. Sadece geliştirme için.
+- `--no-audit`: spec'i denetleyen ikinci LLM geçişini atlar.
+- `--selftest cases:A` / `cases:B`: kitin pratik vakalarıyla test eder; `--reps N` tekrar sayısı.
+- `--spec <dosya>`: LLM adımını atlar, hazır spec'ten kurar. Geliştirmede ve Freya kesintisinde yeniden deploy için (`docs/07_RUNBOOK_FINAL.md`).
 
 ## Test
 
 ```bash
-uv run pytest                 # ağsız birim testleri
-uv run ruff check src tests
-uv run fbb cases <agent_id> --brief A --reps 3     # kitin run_cases.py'si (Freya simülasyonu)
+make test lint secrets-check freeze-check            # birim testleri, ruff, key taraması, src/'de brief değeri yok mu
+uv run fbb cases <slot|agent_id> --brief A --reps 3  # kitin run_cases.py'si (Freya simülasyonu)
+#   --only PUB-04,PUB-07   --style pieces   --rerun-if-slow 1 (model yavaşken koşuyu at, tekrarla)
+uv run fbb chat <slot> "Hello?" --case PUB-01        # yayınlanmış workflow ile tek tur sohbet
 ```
+
+Diğer `fbb` komutları: `call` (bir çağrının zaman çizelgesi), `report` (run_cases özeti ve başarısız çağrılar), `specdiff` (iki spec'in PUAN/METİN/BİLGİ farkları), `days` (başka `now` günlerinde koşu), `scenarios` (kendi senaryolarımız). Ayrıntı: `uv run fbb <komut> --help`.
+
+Bu klasörün dışında aktif bir venv varsa komutların başına `env -u VIRTUAL_ENV` ekleyin (Makefile bunu kendisi yapar).
 
 ## Dizinler
 
@@ -60,4 +67,4 @@ uv run fbb cases <agent_id> --brief A --reps 3     # kitin run_cases.py'si (Frey
 | `src/fbb/build.py` | pipeline |
 | `docs/` | tasarım, kurallar, runbook (Türkçe) |
 
-Kurallar ve tasarım için `docs/00_INDEX.md`'den başlayın. **Test etmek için: `docs/10_TEST_REHBERI.md`.**
+Kurallar ve tasarım için `docs/00_INDEX.md`'den başlayın. **Test etmek için: `docs/10_TEST_REHBERI.md`.** Final penceresi: `docs/07_RUNBOOK_FINAL.md`; teslim: `docs/09_TESLIM.md`; brief açıldıktan sonraki değişiklikler: `docs/BUGFIX_LOG.md`.
