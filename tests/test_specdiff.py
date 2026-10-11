@@ -44,3 +44,20 @@ def test_ab_differs_from_a_only_where_expected():
     paths = {p.split(".")[0] for p, _, _ in d["PUAN"]}
     assert "multi_product" in paths
     assert json.dumps(d["PUAN"]).count("calendar") == 0
+
+
+def test_identity_status_mapping_and_override_note_are_not_score_diffs():
+    """C ikili çıkarımı (11 Eki): status_to_reason'da {'refused': 'refused'} ile boş eşleme aynıdır (closing.py
+    .get(r, r)); override'ın açıklama notu puanı etkilemez."""
+    import json
+
+    from conftest import ROOT
+    from fbb.specdiff import diff
+
+    a = json.loads((ROOT / "tests" / "fixtures" / "variants" / "spec_c_expected.json").read_text())
+    b = json.loads(json.dumps(a))
+    b["closing"]["status_to_reason"] = {}
+    b["overrides"][0]["note"] = "another wording"
+    assert diff(a, b)["PUAN"] == []
+    b["closing"]["status_to_reason"] = {"disputed": "dispute"}
+    assert [d[0] for d in diff(a, b)["PUAN"]] == ["closing.status_to_reason.disputed"]

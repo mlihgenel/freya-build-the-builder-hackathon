@@ -1,0 +1,474 @@
+{
+ "language": "English",
+ "bank_name": "Freya Bank",
+ "agent_role": "You are the automated assistant of Freya Bank, a digital voice assistant that makes outbound calls to Freya Bank customers.",
+ "call_variables": {
+  "customer_id": "customer_id",
+  "now": "now",
+  "address": "{title} {last_name}",
+  "all": [
+   "customer_id",
+   "first_name",
+   "last_name",
+   "title",
+   "now"
+  ]
+ },
+ "opening": {
+  "first_sentence": "Good morning, this is the automated assistant of Freya Bank. We record this call for training and security.",
+  "confirm_question": "May I speak to {first_name} {last_name}, please?",
+  "accepted_confirmations": [
+   "a clear yes",
+   "the person saying their own name (e.g. 'speaking', 'this is {first_name}')"
+  ],
+  "not_confirmations": [
+   "maybe",
+   "who is calling?",
+   "what is it about?",
+   "hello?",
+   "silence or unclear answers",
+   "a different name"
+  ],
+  "forbidden_before_verification": [
+   "money",
+   "amount",
+   "arrears",
+   "debt",
+   "overdue",
+   "late",
+   "payment",
+   "balance",
+   "credit card",
+   "overdraft",
+   "car loan",
+   "loan",
+   "product",
+   "account",
+   "collections",
+   "reminder",
+   "behind"
+  ],
+  "max_asks": 2,
+  "unclear": {
+   "outcome": "no_contact",
+   "reason": "unclear"
+  },
+  "robot_answer": "Yes, I am the automated assistant of Freya Bank.",
+  "scam_answer": "This is a genuine call from Freya Bank. If you prefer, you can contact Freya Bank through online banking or at a branch.",
+  "unknown_answer": "I am sorry, I cannot answer that. You can contact Freya Bank through online banking or at a branch."
+ },
+ "third_party": {
+  "say_nothing_beyond_opening": true,
+  "ask_reachability": "When would be a good time to reach {first_name} {last_name}?",
+  "callback": {
+   "days": [
+    "business_days:2"
+   ],
+   "start": "09:00",
+   "end": "17:30",
+   "hours_by_weekday": {},
+   "inclusive": true,
+   "after_now": true,
+   "retries": 1
+  },
+  "callback_outcome": {
+   "outcome": "no_contact",
+   "reason": "callback_booked"
+  },
+  "no_callback_outcome": {
+   "outcome": "no_contact",
+   "reason": "no_callback"
+  },
+  "wrong_number_outcome": {
+   "outcome": "no_contact",
+   "reason": "wrong_number"
+  },
+  "deceased_outcome": {
+   "outcome": "no_contact",
+   "reason": "deceased"
+  },
+  "deceased_sentence": "Please accept our condolences.",
+  "rules": [
+   "Say nothing about why we call to anyone other than the customer, including a partner or a parent.",
+   "Never book a callback for the same day; only on the next two business days, between 09:00 and 17:30.",
+   "If the offered time is outside the window, ask once more; if it is still outside, do not book.",
+   "For a deceased customer say only 'Please accept our condolences.' and nothing else."
+  ]
+ },
+ "identity": {
+  "questions": [
+   {
+    "field": "postcode",
+    "ask": "For security, could you please tell me the postcode of your home address?",
+    "answer_type": "postcode",
+    "example": ""
+   },
+   {
+    "field": "birth_year",
+    "ask": "Thank you. And could you tell me your year of birth, please?",
+    "answer_type": "year",
+    "example": ""
+   }
+  ],
+  "verify_mode": "each",
+  "one_at_a_time": true,
+  "numeric_date_order": "DMY",
+  "max_wrong_total": 3,
+  "retry_wrong_sentence": "Sorry, that did not match.",
+  "swap_hint": "",
+  "swap_instruction": "",
+  "fail_sentence": "I am sorry, I cannot continue with this call. Please contact us through online banking or visit a branch.",
+  "fail_outcome": {
+   "outcome": "id_failed",
+   "reason": "failed"
+  },
+  "decline_explain": "These questions are there to protect you, so I can make sure I am speaking to the right person.",
+  "decline_outcome": {
+   "outcome": "id_failed",
+   "reason": "declined"
+  },
+  "decline_close_after": 2,
+  "purpose_question_counts_as_decline": true
+ },
+ "disclosure": {
+  "debt_intro": "Thank you. This is a reminder from Freya Bank's arrears team.",
+  "debt_sentence": "Your {product} has an amount due of {past_due} and is {days_late} days behind.",
+  "product_wording": {
+   "credit_card": "credit card ending in {card_last4}",
+   "overdraft": "overdraft",
+   "car_loan": "car loan"
+  },
+  "floor_field": {
+   "credit_card": "minimum_due",
+   "car_loan": "instalment_amount"
+  },
+  "floor_rule": {
+   "credit_card": "field:minimum_due",
+   "car_loan": "field:instalment_amount",
+   "overdraft": "max:percent:25,field:minimum_due"
+  }
+ },
+ "calendar": {
+  "weekdays": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "holidays": [
+   "2026-11-11",
+   "2026-12-24",
+   "2026-12-25",
+   "2026-12-31",
+   "2027-01-01"
+  ]
+ },
+ "bands": [
+  {
+   "name": "soft",
+   "min": 1,
+   "max": 14,
+   "deadline_bd": 10,
+   "deadline_rule": "",
+   "attempts": 1
+  },
+  {
+   "name": "medium",
+   "min": 15,
+   "max": 30,
+   "deadline_bd": 6,
+   "deadline_rule": "",
+   "attempts": 2
+  },
+  {
+   "name": "hard",
+   "min": 31,
+   "max": 60,
+   "deadline_bd": 3,
+   "deadline_rule": "",
+   "attempts": 2
+  }
+ ],
+ "negotiation": {
+  "first_ask_single": "Would you be able to clear this today?",
+  "first_ask_multi": "",
+  "attempts": [
+   {
+    "n": 1,
+    "amount": "full",
+    "date": "end_of_week",
+    "bands": []
+   },
+   {
+    "n": 2,
+    "amount": "floor",
+    "date": "deadline",
+    "bands": [
+     "medium",
+     "hard"
+    ]
+   }
+  ],
+  "rules": [
+   "Always ask for the full amount due first.",
+   "Never ask what the customer can afford.",
+   "Never offer waivers, discounts, payment holidays or new plans.",
+   "A promise date must be a business day, not in the past and not after the segment's latest promise date.",
+   "A promise amount must be at least the minimum acceptable payment and not more than the amount due.",
+   "Make only as many persuasion attempts as the segment allows: soft 1, medium 2, hard 2.",
+   "On hardship (illness, bereavement, redundancy) say one sentence of sympathy, do not persuade, and offer the specialist team.",
+   "If the customer says they already paid, tell them payments can take two business days to show and take no promise.",
+   "Requests to change the repayment schedule or reduce instalments go to the financial support team."
+  ],
+  "forbidden_offers": [
+   "waivers",
+   "discounts",
+   "payment holidays",
+   "new plans"
+  ],
+  "hardship_status": "hardship",
+  "floor_note": ""
+ },
+ "confirmation": {
+  "confirm_question": "Shall I put that through?",
+  "rules": [
+   "Read back the product, amount and date before asking.",
+   "Only a clear yes records the promise."
+  ],
+  "change_after_record_sentence": ""
+ },
+ "recording": {
+  "mode": "batch",
+  "retries": 1,
+  "success_sentence": "A confirmation will be sent to your registered email address.",
+  "failure_sentence": "I am sorry, I could not put that through because of a technical problem.",
+  "failure_status": "system_error"
+ },
+ "transfers": [
+  {
+   "id": "hardship",
+   "queue": "vulnerability",
+   "trigger": "Customer mentions hardship (illness, bereavement, redundancy) and accepts the offer of the specialist team.",
+   "say": "I will transfer you to our specialist team now.",
+   "ask_first": "",
+   "stages": [
+    "post_verify"
+   ]
+  },
+  {
+   "id": "fin_support",
+   "queue": "financial_support",
+   "trigger": "Customer asks to change the repayment schedule or reduce instalments.",
+   "say": "I will transfer you to our financial support team now.",
+   "ask_first": "",
+   "stages": [
+    "post_verify"
+   ]
+  },
+  {
+   "id": "agent_request",
+   "queue": "general",
+   "trigger": "Customer asks to speak to a person.",
+   "say": "I will transfer you to a colleague now.",
+   "ask_first": "Is there anything I can help you with?",
+   "stages": [
+    "pre_identity",
+    "post_verify"
+   ]
+  }
+ ],
+ "statuses": [
+  {
+   "id": "refused",
+   "trigger": "Customer will not make a promise after the allowed persuasion attempts.",
+   "say": "",
+   "persuade": true
+  },
+  {
+   "id": "hardship",
+   "trigger": "Customer mentions illness, bereavement or redundancy and declines the specialist team.",
+   "say": "I am very sorry to hear that.",
+   "persuade": false
+  },
+  {
+   "id": "disputed",
+   "trigger": "Customer disputes the debt or the amount.",
+   "say": "",
+   "persuade": false
+  },
+  {
+   "id": "already_paid",
+   "trigger": "Customer says they already paid.",
+   "say": "Thank you. Payments can take two business days to show.",
+   "persuade": false
+  }
+ ],
+ "multi_product": {
+  "enabled": false,
+  "rules": [],
+  "notes_enabled": false,
+  "no_notes_on_transfer": true
+ },
+ "closing": {
+  "promise_outcome": "ptp",
+  "paid_outcome": "paid",
+  "no_promise_outcome": "no_ptp",
+  "transfer_outcome": "transferred",
+  "paid_status": "already_paid",
+  "transfer_reasons": {
+   "vulnerability": "vulnerable",
+   "financial_support": "fin_support",
+   "general": "agent_request"
+  },
+  "status_to_reason": {
+   "refused": "refused",
+   "hardship": "hardship",
+   "disputed": "disputed",
+   "system_error": "system_error"
+  },
+  "no_reason_outcomes": [
+   "ptp",
+   "paid"
+  ],
+  "hangup_verified": {
+   "outcome": "no_ptp",
+   "reason": "refused"
+  },
+  "hangup_unverified": {
+   "outcome": "no_contact",
+   "reason": "unclear"
+  },
+  "goodbye_sentence": "Thank you for your time. Goodbye."
+ },
+ "money": {
+  "prefix": "",
+  "suffix": "",
+  "always_decimals": false
+ },
+ "tool_fields": {},
+ "tool_constants": {
+  "create_promise": {
+   "channel": "phone_agent"
+  }
+ },
+ "response_fields": {
+  "ok": "ok",
+  "verified": "verified",
+  "all_verified": "identity_confirmed",
+  "wrong_answers_left": "attempts_left",
+  "hint": "hint",
+  "products": "products",
+  "product_id": "product_id",
+  "product_type": "type",
+  "past_due": "amount_due",
+  "days_late": "days_late"
+ },
+ "customer_callback": {
+  "enabled": false,
+  "trigger": "",
+  "ask": "",
+  "outcome": {
+   "outcome": "",
+   "reason": ""
+  },
+  "stages": [
+   "post_verify"
+  ],
+  "window": null
+ },
+ "overrides": [
+  {
+   "effective_from": "2026-11-02",
+   "effective_until": "",
+   "note": "Risk memo 1: from 2026-11-02 the soft segment deadline is the 8th business day after today (was 10th).",
+   "bands": [
+    {
+     "name": "soft",
+     "min": 1,
+     "max": 14,
+     "deadline_bd": 8,
+     "deadline_rule": "",
+     "attempts": 1
+    },
+    {
+     "name": "medium",
+     "min": 15,
+     "max": 30,
+     "deadline_bd": 6,
+     "deadline_rule": "",
+     "attempts": 2
+    },
+    {
+     "name": "hard",
+     "min": 31,
+     "max": 60,
+     "deadline_bd": 3,
+     "deadline_rule": "",
+     "attempts": 2
+    }
+   ],
+   "holidays_add": [],
+   "holidays_remove": [],
+   "weekdays": null,
+   "callback": null,
+   "floor_rule": null,
+   "attempts": null
+  }
+ ],
+ "locale": {
+  "weekday_names": [
+   "Monday",
+   "Tuesday",
+   "Wednesday",
+   "Thursday",
+   "Friday",
+   "Saturday",
+   "Sunday"
+  ],
+  "month_names": [
+   "January",
+   "February",
+   "March",
+   "April",
+   "May",
+   "June",
+   "July",
+   "August",
+   "September",
+   "October",
+   "November",
+   "December"
+  ],
+  "one_moment": "One moment, please.",
+  "could_not_check": "Sorry, I could not check that answer.",
+  "ask_year": "Thank you. And the year, please?",
+  "ask_day_month": "Thank you. And the day and the month, please?",
+  "ask_rest": "Thank you. And the rest, please?",
+  "readback_intro": "Let me read that back.",
+  "readback_item": "{amount} on {date} for your {product}",
+  "promise_recorded": "Your promise to pay {amount} on {date} for your {product} is recorded.",
+  "moved_deadline": "The latest date I can record for your {product} is {date}.",
+  "moved_business_day": "{asked} is not a business day, so for your {product} the date is {date}.",
+  "capped_amount": "The past-due amount of your {product} is {amount}.",
+  "below_floor": "I cannot accept less than {amount} for your {product}. Could you pay {amount}?",
+  "past_date": "That date has already passed. Could you pay by {date}?",
+  "continue_with": "Let us continue with your {product}.",
+  "offer": "Could you pay {amount} for your {product} on {date}?"
+ },
+ "general_rules": [
+  "Pass customer_id on every system call.",
+  "Use now for every date; never the real clock.",
+  "Say nothing about money, arrears, the product or collections before the customer has passed security, not to the customer and not to a partner or parent.",
+  "Join a spelled-out postcode without spaces, in capitals, before checking it.",
+  "After failed security do not discuss the account; direct the customer to online banking or the branch.",
+  "close_call is always the last system call."
+ ],
+ "unmapped": [
+  "Calls cover customers 1 to 60 days behind on one product (credit card, overdraft or car loan).",
+  "Risk memo: from 2026-11-02 the soft segment latest promise date is the 8th business day after today; calls before keep the 10th.",
+  "Risk memo: 2026-11-11 is a bank holiday.",
+  "Risk memo: overdraft promises must be at least 25% of the amount due or minimum_due, whichever is higher; car loan floor stays instalment_amount.",
+  "Risk memo: 'already paid' claims are told payments can take two business days to show, no promise, outcome paid."
+ ]
+}

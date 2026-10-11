@@ -33,6 +33,9 @@ How the program uses the spec:
 - `closing` maps the brief's outcome table: which outcome is used for a recorded promise, for "already paid", for no
   promise, for transfers (queue → reason), and which outcomes take no reason.
 - `transfers`: one entry per situation that hands the call to a person (queue must be a value of the transfer tool).
+  `stages`: a request to speak to a person/human is accepted both before identity (`pre_identity`) and after it
+  (`post_verify`) unless the brief limits it, because handing the call to a colleague reveals nothing about the
+  account. Transfers that only make sense once the debt was discussed (a new plan, a hardship team) are `post_verify`.
 - `identity.questions[].field` must be values of the verify tool's `field` enum (or, if the tool takes one body field
   per question, that field's name); answer_type is "date", "digits:N", "year", "postcode" (letters and digits, e.g.
   a UK postcode), "alnum" (any code of letters and digits, e.g. a company number) or "text". Put an example of the
@@ -59,7 +62,9 @@ How the program uses the spec:
   wrong_answers_left, hint, products, and per product product_id, product_type, past_due, days_late). Read them from
   the "returns:" lines of the tool API.
 - `customer_callback`: only if the brief lets the customer (not a third party) ask to be called back later; give the
-  trigger, the question, the outcome/reason and, if different from the third-party window, the window.
+  trigger, the question, the outcome/reason, `no_callback_outcome` if the brief names a separate outcome for a
+  customer who gives no allowed time (otherwise leave it empty) and, if different from the third-party window, the
+  window.
 - `recording.mode`: "per_product" only if the brief says to record each promise as soon as it is confirmed; otherwise
   "batch" (all promises read back together, one confirmation, then recorded).
 - `locale`: if the brief's language is not English, translate every sentence and the weekday/month names into it,

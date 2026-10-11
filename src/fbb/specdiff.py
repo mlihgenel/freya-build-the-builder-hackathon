@@ -26,6 +26,7 @@ SCORE = (
     "third_party.deceased_outcome", "recording.mode", "recording.retries", "recording.failure_status",
     "multi_product.enabled", "multi_product.notes_enabled", "multi_product.no_notes_on_transfer",
     "customer_callback.enabled", "customer_callback.outcome", "customer_callback.stages", "customer_callback.window",
+    "customer_callback.no_callback_outcome",
     "tool_constants", "tool_fields", "response_fields", "money", "call_variables.customer_id", "call_variables.now",
     "negotiation.hardship_status",
 )
@@ -35,7 +36,7 @@ VERBATIM = (
     "negotiation.floor_note", "recording.success_sentence", "third_party.deceased_sentence",
     "opening.confirm_question", "confirmation.change_after_record_sentence",
 )
-INFO_EXCEPT = ("closing.goodbye_sentence",)  # closing altında ama sadece cümle
+INFO_EXCEPT = ("closing.goodbye_sentence", "overrides.*.note")  # puan alanının altında ama sadece açıklama
 
 
 def load(path: str | Path) -> dict:
@@ -64,6 +65,9 @@ def canonical(spec: dict) -> dict:
     floor = {t: "field:" + f for t, f in (disc.get("floor_field") or {}).items() if f}
     floor.update(disc.get("floor_rule") or {})
     s["floor"] = floor
+    clo = s.get("closing") or {}
+    # kapanış durumu kendi adıyla eşlenir (closing.py: .get(r, r)): kimlik eşlemesi yokla aynıdır
+    clo["status_to_reason"] = {k: v for k, v in (clo.get("status_to_reason") or {}).items() if k != v}
     names = {b2.get("name") for b2 in spec.get("bands") or []}
     for a in (s.get("negotiation") or {}).get("attempts") or []:
         a["bands"] = sorted(a.get("bands") or [])
@@ -88,7 +92,7 @@ def flatten(value, prefix: str = "") -> dict[str, object]:
 
 def level(path: str) -> str:
     generic = re.sub(r"\.\d+(?=\.|$)", ".*", path)
-    if any(path == p or path.startswith(p + ".") for p in INFO_EXCEPT):
+    if any(path == p or path.startswith(p + ".") or generic == p for p in INFO_EXCEPT):
         return "BİLGİ"
     if any(path == p or path.startswith(p + ".") for p in VERBATIM):
         return "METİN"

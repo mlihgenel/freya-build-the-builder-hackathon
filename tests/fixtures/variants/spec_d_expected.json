@@ -1,0 +1,455 @@
+{
+ "language": "English",
+ "bank_name": "Nordlicht Credit",
+ "agent_role": "You are the virtual assistant of Nordlicht Credit, and we record this call.",
+ "call_variables": {
+  "customer_id": "customer_id",
+  "now": "now",
+  "address": "{title} {last_name}",
+  "all": [
+   "customer_id",
+   "first_name",
+   "last_name",
+   "title",
+   "now"
+  ]
+ },
+ "opening": {
+  "first_sentence": "Hello, this is the virtual assistant of Nordlicht Credit. We may record this call.",
+  "confirm_question": "Could I speak to {title} {last_name}, please?",
+  "accepted_confirmations": [
+   "yes",
+   "speaking",
+   "that's me",
+   "the customer giving their own name"
+  ],
+  "not_confirmations": [
+   "who is calling?",
+   "what is this about?",
+   "maybe",
+   "hmm",
+   "hold on"
+  ],
+  "forbidden_before_verification": [
+   "arrears",
+   "money",
+   "payment",
+   "payments",
+   "pay",
+   "debt",
+   "owe",
+   "owed",
+   "amount",
+   "past due",
+   "late",
+   "product",
+   "credit card",
+   "loan",
+   "car loan",
+   "personal loan",
+   "arrangement"
+  ],
+  "max_asks": 2,
+  "unclear": {
+   "outcome": "no_contact",
+   "reason": "unclear"
+  },
+  "robot_answer": "I am Nordlicht Credit's virtual assistant.",
+  "scam_answer": "",
+  "unknown_answer": ""
+ },
+ "third_party": {
+  "say_nothing_beyond_opening": true,
+  "ask_reachability": "When would be a good time to reach {title} {last_name}?",
+  "callback": {
+   "days": [
+    "business_days:2"
+   ],
+   "start": "09:00",
+   "end": "17:00",
+   "hours_by_weekday": {},
+   "inclusive": true,
+   "after_now": true,
+   "retries": 1
+  },
+  "callback_outcome": {
+   "outcome": "no_contact",
+   "reason": "callback_set"
+  },
+  "no_callback_outcome": {
+   "outcome": "no_contact",
+   "reason": "callback_refused"
+  },
+  "wrong_number_outcome": {
+   "outcome": "no_contact",
+   "reason": "wrong_person"
+  },
+  "deceased_outcome": {
+   "outcome": "no_contact",
+   "reason": "bereavement"
+  },
+  "deceased_sentence": "Please accept our sincere condolences.",
+  "rules": [
+   "Give no reason for the call to anyone other than the customer.",
+   "Callbacks only on the next business day or the business day after it, never today, from 09:00 to 17:00, both included.",
+   "If only a time outside the window is offered, ask once for another one; if that is also outside, book nothing: no_contact / callback_refused.",
+   "If the customer has died, say only the condolence sentence and nothing else."
+  ]
+ },
+ "identity": {
+  "questions": [
+   {
+    "field": "postcode",
+    "ask": "For security, could you tell me the postcode of your home address, please?",
+    "answer_type": "postcode",
+    "example": "AB12CD"
+   },
+   {
+    "field": "birth_year",
+    "ask": "Thank you. And your year of birth, please?",
+    "answer_type": "year",
+    "example": "1980"
+   }
+  ],
+  "verify_mode": "each",
+  "one_at_a_time": true,
+  "numeric_date_order": "DMY",
+  "max_wrong_total": 3,
+  "retry_wrong_sentence": "That does not match our records. Could you try again, please?",
+  "swap_hint": "",
+  "swap_instruction": "",
+  "fail_sentence": "I am sorry, I cannot give you any account information. Please use our online banking.",
+  "fail_outcome": {
+   "outcome": "security_fail",
+   "reason": "wrong_answers"
+  },
+  "decline_explain": "These questions are there to protect you and your account.",
+  "decline_outcome": {
+   "outcome": "security_fail",
+   "reason": "refused_security"
+  },
+  "decline_close_after": 2,
+  "purpose_question_counts_as_decline": true
+ },
+ "disclosure": {
+  "debt_intro": "Thank you, {title} {last_name}. I am calling about late payments on your account.",
+  "debt_sentence": "Your {product} is {past_due} past due and {days_late} days behind.",
+  "product_wording": {
+   "credit_card": "credit card ending {card_last4}",
+   "personal_loan": "personal loan",
+   "car_loan": "car loan"
+  },
+  "floor_field": {
+   "credit_card": "minimum_payment",
+   "personal_loan": "instalment_amount",
+   "car_loan": "instalment_amount"
+  },
+  "floor_rule": {}
+ },
+ "calendar": {
+  "weekdays": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "holidays": [
+   "2026-10-26",
+   "2026-11-11",
+   "2026-12-24",
+   "2026-12-25",
+   "2026-12-31",
+   "2027-01-01"
+  ]
+ },
+ "bands": [
+  {
+   "name": "early",
+   "min": 1,
+   "max": 10,
+   "deadline_bd": 9,
+   "deadline_rule": "",
+   "attempts": 1
+  },
+  {
+   "name": "middle",
+   "min": 11,
+   "max": 40,
+   "deadline_bd": 5,
+   "deadline_rule": "",
+   "attempts": 2
+  },
+  {
+   "name": "late",
+   "min": 41,
+   "max": 75,
+   "deadline_bd": 2,
+   "deadline_rule": "",
+   "attempts": 2
+  }
+ ],
+ "negotiation": {
+  "first_ask_single": "Would you be able to pay everything today?",
+  "first_ask_multi": "Would you be able to pay everything today?",
+  "attempts": [
+   {
+    "n": 1,
+    "amount": "full",
+    "date": "end_of_week",
+    "bands": []
+   },
+   {
+    "n": 2,
+    "amount": "floor",
+    "date": "deadline",
+    "bands": [
+     "middle",
+     "late"
+    ]
+   }
+  ],
+  "rules": [
+   "State all products before asking anything.",
+   "Ask the first question once for all products; if not, go product by product in get_account order.",
+   "Always ask for the full past-due amount first. Never ask what the customer can afford.",
+   "Accept any amount from the lowest acceptable amount (minimum_payment for a credit card, instalment_amount for a loan) up to the full past-due amount.",
+   "If the full amount is too much, offer the lowest amount once and say the remainder stays in arrears.",
+   "A flat no uses one persuasion attempt for that product; early stage has 1 attempt, middle and late have 2.",
+   "When the attempts for a product are used up, move on to the next product.",
+   "A promise date must be a business day, today or later, and not after that product's latest date.",
+   "A weekend day or holiday before the latest date moves to the next business day; a date after the latest date: offer the latest date instead.",
+   "Illness, bereavement or job loss: say one sentence of sympathy, do not persuade, offer the hardship team. Accepted: transfer to support. Declined: every product without an arrangement gets status hardship.",
+   "Never offer discounts, waivers, payment holidays or new plans."
+  ],
+  "forbidden_offers": [
+   "discounts",
+   "waivers",
+   "payment holidays",
+   "new plans"
+  ],
+  "hardship_status": "hardship",
+  "floor_note": "The remainder will stay in arrears."
+ },
+ "confirmation": {
+  "confirm_question": "Is that correct?",
+  "rules": [
+   "As soon as the customer agrees an arrangement for a product, read back that product, amount and date and ask 'Is that correct?'.",
+   "Only a clear yes counts.",
+   "Then call create_promise for that product straight away, before talking about the next product."
+  ],
+  "change_after_record_sentence": ""
+ },
+ "recording": {
+  "mode": "per_product",
+  "retries": 1,
+  "success_sentence": "Thank you, that arrangement is now in place.",
+  "failure_sentence": "I am sorry, I could not set up that arrangement.",
+  "failure_status": "system_error"
+ },
+ "transfers": [
+  {
+   "id": "hardship",
+   "queue": "support",
+   "trigger": "Customer mentions illness, bereavement or job loss and accepts the offer of the hardship team",
+   "say": "I will put you through to our hardship team now.",
+   "ask_first": "Would you like me to put you through to our hardship team?",
+   "stages": [
+    "post_verify"
+   ]
+  },
+  {
+   "id": "restructure",
+   "queue": "restructuring",
+   "trigger": "Customer asks to restructure, reduce instalments or freeze interest",
+   "say": "I will put you through to a colleague who can look at that.",
+   "ask_first": "",
+   "stages": [
+    "post_verify"
+   ]
+  },
+  {
+   "id": "person",
+   "queue": "general",
+   "trigger": "Customer asks for a person and insists after being asked once whether the assistant can help",
+   "say": "I will put you through to a colleague now.",
+   "ask_first": "Can I help you with that myself?",
+   "stages": [
+    "pre_identity",
+    "post_verify"
+   ]
+  }
+ ],
+ "statuses": [
+  {
+   "id": "refused",
+   "trigger": "Customer says no and the persuasion attempts for the product are used up",
+   "say": "",
+   "persuade": true
+  },
+  {
+   "id": "hardship",
+   "trigger": "Customer mentions illness, bereavement or job loss and declines the hardship team",
+   "say": "I am very sorry to hear that.",
+   "persuade": false
+  },
+  {
+   "id": "dispute",
+   "trigger": "Customer says 'that is not my account' or 'I never had that'",
+   "say": "Thank you, I have noted that.",
+   "persuade": false
+  },
+  {
+   "id": "paid",
+   "trigger": "Customer says they already paid",
+   "say": "Thank you. Payments can take up to two business days to show.",
+   "persuade": false
+  },
+  {
+   "id": "system_error",
+   "trigger": "create_promise failed twice for the product",
+   "say": "",
+   "persuade": false
+  }
+ ],
+ "multi_product": {
+  "enabled": true,
+  "rules": [
+   "Go product by product in the order get_account returned them.",
+   "Record each arrangement right after it is confirmed, before discussing the next product.",
+   "For each product without an arrangement, call add_note with that product_id and its status: refused, hardship, dispute, paid or system_error.",
+   "Add no notes when the call is handed over.",
+   "Arrangements already recorded stay when the call is transferred for restructuring."
+  ],
+  "notes_enabled": true,
+  "no_notes_on_transfer": true
+ },
+ "closing": {
+  "promise_outcome": "arranged",
+  "paid_outcome": "already_paid",
+  "no_promise_outcome": "no_arrangement",
+  "transfer_outcome": "handed_over",
+  "paid_status": "paid",
+  "transfer_reasons": {
+   "restructuring": "restructure",
+   "general": "person_requested",
+   "support": "hardship_team"
+  },
+  "status_to_reason": {},
+  "no_reason_outcomes": [
+   "arranged",
+   "already_paid"
+  ],
+  "hangup_verified": {
+   "outcome": "no_arrangement",
+   "reason": "refused"
+  },
+  "hangup_unverified": {
+   "outcome": "no_contact",
+   "reason": "unclear"
+  },
+  "goodbye_sentence": "Thank you for your time, {title} {last_name}. Goodbye."
+ },
+ "money": {
+  "prefix": "",
+  "suffix": "",
+  "always_decimals": false
+ },
+ "tool_fields": {},
+ "tool_constants": {},
+ "response_fields": {
+  "ok": "ok",
+  "verified": "verified",
+  "all_verified": "all_verified",
+  "wrong_answers_left": "wrong_answers_left",
+  "hint": "hint",
+  "products": "products",
+  "product_id": "product_id",
+  "product_type": "type",
+  "past_due": "past_due",
+  "days_late": "days_late"
+ },
+ "customer_callback": {
+  "enabled": true,
+  "trigger": "After passing security the customer says they cannot talk now and asks to be called later",
+  "ask": "When would be a good time to call you back?",
+  "outcome": {
+   "outcome": "no_arrangement",
+   "reason": "call_later"
+  },
+  "stages": [
+   "post_verify"
+  ],
+  "window": {
+   "days": [
+    "business_days:2"
+   ],
+   "start": "09:00",
+   "end": "17:00",
+   "hours_by_weekday": {},
+   "inclusive": true,
+   "after_now": true,
+   "retries": 1
+  },
+  "no_callback_outcome": {
+   "outcome": "no_arrangement",
+   "reason": "refused"
+  }
+ },
+ "overrides": [],
+ "locale": {
+  "weekday_names": [
+   "Monday",
+   "Tuesday",
+   "Wednesday",
+   "Thursday",
+   "Friday",
+   "Saturday",
+   "Sunday"
+  ],
+  "month_names": [
+   "January",
+   "February",
+   "March",
+   "April",
+   "May",
+   "June",
+   "July",
+   "August",
+   "September",
+   "October",
+   "November",
+   "December"
+  ],
+  "one_moment": "One moment, please.",
+  "could_not_check": "Sorry, I could not check that answer.",
+  "ask_year": "Thank you. And the year, please?",
+  "ask_day_month": "Thank you. And the day and the month, please?",
+  "ask_rest": "Thank you. And the rest, please?",
+  "readback_intro": "Let me read that back.",
+  "readback_item": "{amount} on {date} for your {product}",
+  "promise_recorded": "Your promise to pay {amount} on {date} for your {product} is recorded.",
+  "moved_deadline": "The latest date I can record for your {product} is {date}.",
+  "moved_business_day": "{asked} is not a business day, so for your {product} the date is {date}.",
+  "capped_amount": "The past-due amount of your {product} is {amount}.",
+  "below_floor": "I cannot accept less than {amount} for your {product}. Could you pay {amount}?",
+  "past_date": "That date has already passed. Could you pay by {date}?",
+  "continue_with": "Let us continue with your {product}.",
+  "offer": "Could you pay {amount} for your {product} on {date}?"
+ },
+ "general_rules": [
+  "Pass customer_id to every tool call.",
+  "Address the customer as title plus last name.",
+  "Never mention arrears, money, payments or a product before security is passed, to anyone.",
+  "Every call ends with exactly one close_call, as the last tool call.",
+  "Thank the customer and say goodbye before close_call.",
+  "If asked whether this is a machine, say you are Nordlicht Credit's virtual assistant and carry on.",
+  "Never offer discounts, waivers, payment holidays or new plans."
+ ],
+ "unmapped": [
+  "If the customer cannot talk now after security, do not discuss the debt further; if no time inside the callback window is offered after one retry, book nothing and close no_arrangement / refused.",
+  "Closing for no_arrangement uses the status of the first product (in get_account order) that is not paid.",
+  "already_paid is used only when every product has the status paid.",
+  "arranged is used when at least one arrangement was recorded, unless the call was handed over."
+ ]
+}
