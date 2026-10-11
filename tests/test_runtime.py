@@ -283,3 +283,29 @@ def test_lone_number_is_partial_date(ns):
     assert ns["normalize_answer"]("date", "It is 1")[1] == "partial"
     assert ns["normalize_answer"]("date", "I don't know")[1] == "unreadable"
     assert ns["combine_answer"]({"answer_type": "date"}, "12 July 1991", "1") == ("1991-07-12", "ok")
+
+
+@pytest.mark.parametrize("text,iso", [
+    ("on dört mart bin dokuz yüz seksen sekiz", "1988-03-14"),
+    ("14 Mart 1988", "1988-03-14"),
+    ("On Dört Ağustos İki Bin Beş", "2005-08-14"),
+    ("yirmi bir temmuz bin dokuz yüz doksan", "1990-07-21"),
+    ("on dördüncü mart bin dokuz yüz seksen sekiz", "1988-03-14"),
+    ("3 Haziran 1987", "1987-06-03"),
+])
+def test_turkish_dates(ns, text, iso):
+    """Final vakası Türkçe (11 Eki duyurusu): söylenen tarih ISO'ya."""
+    assert ns["normalize_answer"]("date", text) == (iso, "ok")
+
+
+def test_turkish_digits_amounts_and_english_unchanged(ns):
+    assert ns["normalize_answer"]("digits:4", "dört dört yedi bir") == ("4471", "ok")
+    assert ns["normalize_answer"]("digits:4", "kırk dört yetmiş bir") == ("4471", "ok")
+    assert ns["normalize_answer"]("digits:4", "çift dört yedi bir") == ("4471", "ok")
+    assert ns["normalize_amount"]("dört yüz elli") == 450
+    assert ns["normalize_amount"](ns["amount_text"]("637,50")) == 637.5
+    assert ns["normalize_amount"](ns["amount_text"]("1.250,75")) == 1250.75
+    assert ns["normalize_amount"](ns["amount_text"]("1,250.75")) == 1250.75
+    assert ns["normalize_answer"]("date", "the fourteenth of March nineteen eighty-eight") == ("1988-03-14", "ok")
+    assert ns["digits_from_speech"]("call me on four four") == "44"  # İngilizce 'on' sayı değil
+    assert ns["normalize_answer"]("year", "bin dokuz yüz seksen sekiz") == ("1988", "ok")

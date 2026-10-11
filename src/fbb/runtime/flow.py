@@ -373,7 +373,7 @@ def check_offer_answer(vars, RT, answer, amount="", date=""):
     if answer.startswith("agree"):
         try:
             when = to_date(str(date).strip()[:10])
-            value = normalize_amount(re.sub(r"[^0-9a-zA-Z.,\- ]", "", str(amount)).replace(",", ""))
+            value = normalize_amount(amount_text(re.sub(r"[^0-9a-zA-Z.,\- ]", "", str(amount))))
         except Exception:
             when, value = None, None
         if when is None or value is None:

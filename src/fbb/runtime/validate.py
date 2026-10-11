@@ -20,7 +20,7 @@ def parse_results(text):
         entry = {"product_id": bits[0], "kind": "", "amount": None, "date": ""}
         if len(bits) >= 3:
             entry["kind"] = "promise"
-            amount = normalize_amount(re.sub(r"[^0-9a-zA-Z.,\- ]", "", bits[1]).replace(",", ""))
+            amount = normalize_amount(amount_text(re.sub(r"[^0-9a-zA-Z.,\- ]", "", bits[1])))
             entry["amount"] = amount
             entry["date"] = bits[2][:10]
         elif len(bits) == 2:

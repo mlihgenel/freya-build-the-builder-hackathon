@@ -27,6 +27,6 @@ __pycache__/
 # trace ve export'lardan sadece teslim edilecekler (final-* slotları) git'e girer; geliştirme ve prova
 # çıktıları (dev-*, prova-*, rep-*, sonnet-* …) yerelde kalır
 traces/*
-!traces/final-*
+!traces/final*
 exports/*
-!exports/final-*
+!exports/final*

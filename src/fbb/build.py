@@ -28,6 +28,7 @@ class BuildOptions:
     deploy: bool = True          # False: sadece yerel çıktı (Freya'ya dokunmaz)
     selftest: str = "none"       # none | smoke | cases:A | cases:B
     reps: int = 1
+    base_url: str = ""           # verilirse tool API'sinin sunucusu (final: kendi mock'umuz)
     notes: list[str] = field(default_factory=list)
 
 
@@ -39,7 +40,22 @@ def run_build(opts: BuildOptions) -> dict:
                 builder_model=config.builder_model(), spec_file=opts.spec_file or None)
     result: dict = {"slot": slot, "trace": str(trace.txt)}
     try:
-        cat = load_catalog(opts.tools)
+        tools_path = opts.tools
+        if not tools_path:  # final formatı: klasörde openapi yoksa servis sözleşmesinden çıkar
+            from fbb.ingest.contract import openapi_from_contract
+            from fbb.ingest.sources import find_openapi
+
+            found = find_openapi(opts.briefs)
+            if found:
+                tools_path = str(found)
+                trace.event("tools_file", f"tool API dosyası klasörde bulundu: {found}")
+            else:
+                config.OUT.mkdir(parents=True, exist_ok=True)
+                tools_path = str(openapi_from_contract(read_sources(opts.briefs), config.OUT / f"{slot}.openapi.json",
+                                                       trace))
+        cat = load_catalog(tools_path)
+        if opts.base_url:
+            cat.base_url = with_base(opts.base_url, cat.base_url)
         trace.event("tools", f"{len(cat.tools)} tool, base {cat.base_url}", tools=sorted(cat.tools))
         if opts.spec_file:
             spec = PolicySpec.model_validate(json.loads(Path(opts.spec_file).read_text()))
@@ -106,6 +122,16 @@ def run_build(opts: BuildOptions) -> dict:
     except Exception as e:
         trace.event("error", f"build başarısız: {e}")
         raise
+
+
+def with_base(mock_url: str, server_url: str) -> str:
+    """Verilen mock adresi yolsuzsa sözleşmedeki sunucunun yolunu (ör. /v1) korur."""
+    from urllib.parse import urlparse
+
+    mock = mock_url.rstrip("/")
+    if urlparse(mock).path in ("", "/"):
+        return mock + urlparse(server_url or "").path.rstrip("/")
+    return mock
 
 
 def _diff_stored(sent: dict, stored: dict) -> list[str]:

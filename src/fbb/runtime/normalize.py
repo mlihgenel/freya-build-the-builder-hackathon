@@ -33,15 +33,56 @@ def word_value(word):
     return None
 
 
+TR_FOLD = dict(zip("ışğüöçâîû", "isguocaiu"))
+TR_WORDS = dict(
+    sifir="zero", bir="one", iki="two", uc="three", dort="four", bes="five", alti="six", yedi="seven", sekiz="eight",
+    dokuz="nine", on="ten", yirmi="twenty", otuz="thirty", kirk="forty", elli="fifty", altmis="sixty",
+    yetmis="seventy", seksen="eighty", doksan="ninety", yuz="hundred", bin="thousand", virgul="point", nokta="point",
+    birinci="first", ikinci="second", ucuncu="third", dorduncu="fourth", besinci="fifth", altinci="sixth",
+    yedinci="seventh", sekizinci="eighth", dokuzuncu="ninth", onuncu="tenth", yirminci="twentieth",
+    otuzuncu="thirtieth", ocak="january", subat="february", mart="march", nisan="april", mayis="may",
+    haziran="june", temmuz="july", agustos="august", eylul="september", ekim="october", kasim="november",
+    aralik="december", cift="double", ve="and")
+TR_ONLY = ("sifir", "iki", "uc", "dort", "bes", "alti", "yedi", "sekiz", "dokuz", "yirmi", "otuz", "kirk", "elli",
+           "altmis", "yetmis", "seksen", "doksan", "yuz", "ocak", "subat", "mart", "nisan", "mayis", "haziran", "temmuz",
+           "agustos", "eylul", "ekim", "kasim", "aralik", "birinci", "ikinci", "ucuncu", "dorduncu", "besinci",
+           "altinci", "yedinci", "sekizinci", "dokuzuncu", "onuncu")
+
+
+def tr_fold(word):
+    return "".join(TR_FOLD.get(ch, ch) for ch in word)
+
+
 def tokens(text):
-    t = str(text or "").lower().replace("-", " ").replace(",", " ")
-    t = re.sub(r"(\d)(st|nd|rd|th)\b", r"\1", t)
+    """Küçük harfli kelimeler. Metin Türkçe görünüyorsa (Türkçe harf ya da yalnız Türkçede olan bir sayı/ay kelimesi)
+    Türkçe sayı, sıra ve ay kelimeleri İngilizce karşılıklarına çevrilir; okuma kodu tek dilde kalır."""
+    raw = str(text or "").replace("İ", "i").replace("I", "i").lower().replace("-", " ").replace(",", " ")
+    raw = re.sub(r"(\d)(st|nd|rd|th)\b", r"\1", raw)
+    raw = re.sub(r"(\d)[.'’](inci|ıncı|uncu|üncü|nci|ncı|ncu|ncü|ci|cı|cu|cü)\b", r"\1", raw)
+    words = [w for w in re.split(r"[^\w.]+", raw) if w]
+    folded = [tr_fold(w).strip(".") for w in words]
+    turkish = bool(re.search("[ışğüöç]", raw)) or any(w in TR_ONLY for w in folded)
     out = []
-    for x in re.split(r"[^a-z0-9.]+", t):
+    for x, f in zip(words, folded, strict=True):
+        if turkish and f in TR_WORDS:
+            out.append(TR_WORDS[f])
+            continue
         x = x if re.fullmatch(r"\d+\.\d+", x) else x.strip(".")
-        if x:
+        if x and re.fullmatch(r"[a-z0-9.]+", x):
             out.append(x)
+        elif x and turkish:
+            out.append(f)
     return out
+
+
+def amount_text(text):
+    """'637,50' (Türkçe ondalık virgül) ve '1.250,75' → '637.50', '1250.75'; '1,250.75' → '1250.75'."""
+    t = str(text or "").strip()
+    if re.fullmatch(r"\d{1,3}(\.\d{3})+,\d{1,2}", t):
+        return t.replace(".", "").replace(",", ".")
+    if re.fullmatch(r"\d+,\d{1,2}", t):
+        return t.replace(",", ".")
+    return t.replace(",", "")
 
 
 def words_to_number(text):

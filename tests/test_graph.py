@@ -34,7 +34,7 @@ def test_workflow_lints_clean(cat, name):
     warnings = []
     assert _lint(wf, s, cat, warnings) == []
     assert warnings == []
-    assert len(json.dumps(wf)) < 340_000  # her snippet RT'yi gömüyor; boyut F-08'de denenenin yakınında kalmalı
+    assert len(json.dumps(wf)) < 400_000  # her snippet RT'yi gömüyor; dryRun 1,2 MB'ı kabul etti (Faz 3.10)
 
 
 def test_deterministic(cat):
