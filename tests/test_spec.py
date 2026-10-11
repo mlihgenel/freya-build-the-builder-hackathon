@@ -66,3 +66,9 @@ def test_runtime_matches_hand_rt():
     for key in ("cal", "bands", "floor_rule", "product_wording", "attempts", "callback", "status_reasons"):
         assert rt[key] == RT_A[key], key
     assert rt["closing"]["transfer_reasons"] == RT_A["closing"]["transfer_reasons"]
+
+
+def test_cross_check_hardship_status(cat):
+    spec = load("spec_a.json")
+    spec.negotiation.hardship_status = "nope"
+    assert any("hardship_status" in e for e in cross_check(spec, cat))

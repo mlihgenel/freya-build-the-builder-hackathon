@@ -180,7 +180,10 @@ def test_decline_on_second_question_reasks_second_question(cat):
     v = {"id_q": "0"}
     run_snippet(_tool_code(n["ask_q1"], "decline_questions"), vars=v)
     run_snippet(_code_of(n["id_fix"]), vars=v)
-    assert "four digits" in v["id_say"] and "date of birth" not in v["id_say"]
+    assert v["id_say"].startswith("These questions protect") and "date of birth" not in v["id_say"]
+    v["submit_answer_args.answer"] = "four four one zero"
+    run_snippet(_tool_code(n["reask"], "submit_answer"), vars=v)
+    assert v["id_answer"] == "4410" and _route(n["reask"], v) == "verify_q1"  # cevap 2. soruya gider
 
 
 def test_full_year_after_pieces_wins(cat):
@@ -617,3 +620,128 @@ def test_one_day_for_all_products_keeps_each_deadline(cat, public_cases):
     queue = {q["product_id"]: q["date"] for q in json.loads(v["rec_queue"])}
     assert queue == {"p1": "2026-10-30", "p2": "2026-10-23"}
     assert "Friday 30 October" in v["readback_say"] and "Friday 23 October" in v["readback_say"]
+
+
+def test_propose_results_keeps_offers_already_agreed(cat, public_cases):
+    """Bir ürün next_offer ile anlaşıldıktan sonra diğerinde dispute: model sadece dispute'u yazsa da önceki anlaşma
+    kaybolmaz (eksik ürün hatası yok)."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    plans = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    p1, p2, p3 = (p["product_id"] for p in plans)
+    assert _offer(n, v, "agreed", amount=str(plans[0]["past_due"]), date="2026-10-15") == "negotiate_fix_say"
+    assert _propose(n, v, f"{p2}:dispute; {p3}:refused", "negotiate_fix_say") == "readback"
+    assert [q["product_id"] for q in json.loads(v["rec_queue"])] == [p1]
+    assert {x["product_id"] for x in json.loads(v["statuses_json"])} == {p2, p3}
+
+
+def test_offer_goes_straight_to_speech(cat, public_cases):
+    """Ret turunda tool + offer_step dışında code node'u yok (commit_fix ile ~10 sn sessizlik oluyordu)."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    _account(n, v, public_cases["PUB-12"], "spec_ab")
+    v.update({"next_offer_args.result": "refused", "next_offer_args.agreed_amount": "",
+              "next_offer_args.agreed_date": ""})
+    run_snippet(_tool_code(n["negotiate"], "next_offer"), vars=v)
+    assert _route(n["negotiate"], v) == "offer_step"
+    run_snippet(_code_of(n["offer_step"]), vars=v)
+    assert _route(n["offer_step"], v) == "negotiate_fix_say" and v["commit"] == ""
+    assert _route(n["negotiate_fix_say"], v) is None  # eski bayrakla tekrar tetiklenmez
+
+
+def test_readback_rejection_reopens_offers(cat, public_cases):
+    """Model 'agreed_all' dedi ama müşteri sadece ilk ürünü kabul etmişti: read-back reddi teklif durumunu geri alır,
+    ikna denemeleri sıradaki ürünlerde yine yapılır (11 Eki PUB-12)."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    plans = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    assert _offer(n, v, "agreed_all", amount="510", date="2026-10-15") == "readback"
+    run_snippet(_code_of(n["readback_reset"]), vars=v)
+    assert "next_offer" in v["fix_prompt"]
+    assert _offer(n, v, "agreed", "negotiate_fix", str(plans[0]["past_due"]), "2026-10-15") == "negotiate_fix_say"
+    assert v["commit_say"].startswith("Let us continue with your")
+
+
+def test_hardship_decline_closes_without_new_offer(cat, public_cases):
+    """PUB-05: teklifi model bir kez yapar; ret 'hardship' ile gelince ürün ikna denemesi ve yeni teklif olmadan
+    hardship ile kapanır (birçok koşuda teklif iki kez söylenmişti)."""
+    n = build_workflow(spec("spec_a.json"), cat)["nodes"]
+    v = {}
+    _account(n, v, public_cases["PUB-05"], "spec_a")
+    assert _offer(n, v, "hardship") == "send_close"
+    assert (v["close_outcome"], v["close_reason"]) == ("no_promise", "hardship")
+
+
+def test_hardship_closes_every_remaining_product(cat, public_cases):
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    plans = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    assert _offer(n, v, "agreed", amount=str(plans[0]["past_due"]), date="2026-10-15") == "negotiate_fix_say"
+    assert _offer(n, v, "hardship", "negotiate_fix_say") == "readback"
+    assert sorted(x["reason"] for x in json.loads(v["statuses_json"])) == ["hardship", "hardship"]
+
+
+def test_hardship_without_spec_status_is_left_to_the_model(cat):
+    s = spec("spec_a.json")
+    s.negotiation.hardship_status = ""
+    n = build_workflow(s, cat)["nodes"]
+    desc = [t for t in n["negotiate"]["tools"] if t["function"]["name"] == "next_offer"][0]
+    assert "hardship" not in json.dumps(desc["function"]["parameters"]["properties"]["result"])
+    assert "result='hardship'" not in n["negotiate"]["task_message"]
+
+
+def test_hardship_declined_after_model_offer_closes_without_repeat(cat, public_cases):
+    """talkative PUB-05: model teklifi kendisi yaptı; ret 'hardship_declined' ile gelince kod teklifi tekrarlamaz."""
+    n = build_workflow(spec("spec_a.json"), cat)["nodes"]
+    v = {}
+    _account(n, v, public_cases["PUB-05"], "spec_a")
+    assert _offer(n, v, "hardship_declined") == "send_close"
+    assert (v["close_outcome"], v["close_reason"]) == ("no_promise", "hardship")
+
+
+def test_per_product_with_next_offer(cat, public_cases):
+    """Faz 3.1: per_product'ta kabul edilen ürün hemen okunur ve kaydedilir; kayıttan sonra 'kaydedildi' + sıradaki
+    ürünün ilk teklifi; retler sonda not olarak (transfer yoksa)."""
+    s = spec("spec_ab.json")
+    s.recording.mode = "per_product"
+    n = build_workflow(s, cat)["nodes"]
+    v = {}
+    plans = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    p1, p2, p3 = plans
+    assert _offer(n, v, "agreed", amount=str(p1["past_due"]), date="2026-10-15") == "readback"
+    assert [q["product_id"] for q in json.loads(v["rec_queue"])] == ["p1"] and p2["wording"] not in v["readback_say"]
+    v["rec_r_ok"] = "true"
+    run_snippet(_code_of(n["rec_step"]), vars=v)
+    assert _route(n["rec_step"], v) == "negotiate_more"
+    assert "is recorded" in v["progress_say"] and p2["wording"] in v["progress_say"]
+    assert "Could you pay" in v["progress_say"]  # p2'nin 1. teklifi kayıt cümlesiyle birlikte
+    assert _offer(n, v, "refused", "negotiate_more") == "negotiate_fix_say"   # p2 2. deneme
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "negotiate_fix_say"  # p2 bitti → p3 1. deneme
+    assert p3["wording"] in v["commit_say"]
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "record_note"       # p3 bitti → notlar
+    notes = []
+    while v.get("next_step") in ("note", None) or _route(n["note_step"], v) == "record_note":
+        notes.append(v["note_pid"])
+        v["note_r_ok"] = "true"
+        run_snippet(_code_of(n["note_step"]), vars=v)
+        if v["next_step"] != "note":
+            break
+    assert notes == ["p2", "p3"] and v["next_step"] == "end_nr" and v["close_outcome"] == "promise"
+    assert "is recorded" not in v["closing_speech"]  # p1 zaten duyuruldu
+
+
+def test_per_product_last_product_agreed_after_refusals(cat, public_cases):
+    """per_product: önceki ürünler reddedildi, sonuncusu kabul: bekleyen durumlar da aynı öneriye girer, döngü yok."""
+    s = spec("spec_ab.json")
+    s.recording.mode = "per_product"
+    n = build_workflow(s, cat)["nodes"]
+    v = {}
+    plans = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    assert _offer(n, v, "refused") == "negotiate_fix_say"
+    for _ in range(4):  # p1: 2. deneme + ret, p2: 2 deneme + ret → p3ün 1. teklifi
+        assert _offer(n, v, "refused", "negotiate_fix_say") == "negotiate_fix_say"
+    assert plans[2]["wording"] in v["commit_say"]
+    assert _offer(n, v, "agreed", "negotiate_fix_say", str(plans[2]["past_due"]), "2026-10-16") == "readback"
+    v["rec_r_ok"] = "true"
+    run_snippet(_code_of(n["rec_step"]), vars=v)
+    assert v["next_step"] == "note"  # sıradaki ürün yok, notlara geçilir (negotiate_more döngüsü yok)

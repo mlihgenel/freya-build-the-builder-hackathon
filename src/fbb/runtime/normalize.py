@@ -314,6 +314,8 @@ def normalize_answer(answer_type, text, numeric_order="DMY", example=""):
             return (day.isoformat(), "ok") if day else (raw, "unreadable")
         if y is not None or m is not None or d is not None:
             return raw, "partial"
+        if re.search(r"\d", raw) or any(word_value(t) for t in tokens(raw)):
+            return raw, "partial"  # "It is 1…": sayının başı geldi, ay ya da yıl yok
         return raw, "unreadable"
     if answer_type.startswith("digits"):
         want = int(answer_type.split(":", 1)[1]) if ":" in answer_type else 0

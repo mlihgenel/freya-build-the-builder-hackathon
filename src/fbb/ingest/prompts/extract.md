@@ -21,6 +21,8 @@ How the program uses the spec:
 - The program makes every persuasion proposal itself from `negotiation.attempts` (amount and date). Put the sentence
   the brief requires when a lower amount (the floor) is offered, e.g. that the rest stays overdue, in
   `negotiation.floor_note`.
+- If the brief says to offer a transfer to a team when the customer mentions a hardship (illness, a death, job loss…),
+  write in `negotiation.hardship_status` the status id a product gets when the offer is declined.
 - Callback windows: `days` items are "today", "next_business_day" or "business_days:N" (each of the next N business
   days); if the hours differ per weekday use `hours_by_weekday` ("0" = Monday … "6" = Sunday).
 - Templates use single braces: call variables (e.g. {title}, {last_name}) and fields of a product returned by the

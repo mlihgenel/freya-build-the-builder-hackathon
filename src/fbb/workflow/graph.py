@@ -180,7 +180,7 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
                   when_eq("close_id_declined", "the customer refused the questions", "id_decl", "close"),
                   when_eq("id_fix", "explain why the questions are needed", "id_decl", "explain")]
         return conversation(name, texts.identity_task(spec, spoken), on_enter={"type": "tts", "text": spoken},
-                            tools=[submit, decline], transitions=trans + pre_extra, max_turns=12,
+                            tools=[submit, decline], transitions=trans + pre_extra, max_turns=30,
                             max_turn_target="close_id_declined")
 
     for k, q in enumerate(qs):
@@ -248,11 +248,19 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
         "next_offer",
         "CALL it, instead of speaking, every time the customer answers about the CURRENT product (the one the system "
         "proposed last; at the start the first product): a flat refusal or no answer, 'the amount is too much', or "
-        "an agreed amount and date. The system then makes the next proposal itself (also the first one for the next "
+        "an agreed amount and date. A question or a vague reply ('you tell me', 'I don't know', 'what can I do?') is "
+        "NOT a refusal: do not call it then; answer in one sentence and ask only whether the proposal works. Never "
+        "call it on a message that is cut off (it ends with a comma, 'and', 'on the' or without a full stop): say "
+        "only a short varied acknowledgement ('Mm-hm.', 'I'm listening.') and wait for the rest, which may correct "
+        "what they said. The system then makes the next proposal itself (also the first one for the next "
         "product) or, when every product is settled, reads the promises back. Never propose an amount, a date or "
         "'today' yourself.",
-        {"result": "'refused' (flat no or no answer), 'too_much' (the amount is too high), 'agreed' (this product) "
-                   "or 'agreed_all' (one day for this and every later product, each in full).",
+        {"result": "'refused' (flat no or no answer), 'too_much' (the amount is too high), 'agreed' (this product "
+                   "only) or 'agreed_all' (ONLY when the customer explicitly agrees one day for this and every later "
+                   "product, each in full). If they agree to this product and refuse others, use 'agreed'."
+                   + (" 'hardship' when the customer declines the support transfer you offered for a hardship (or "
+                      "says again they cannot pay after it): every open product then ends with the hardship status."
+                      if spec.negotiation.hardship_status else ""),
          "agreed_amount": "Only for 'agreed': the amount as a number, e.g. 250.50. Otherwise ''.",
          "agreed_date": "Only for 'agreed' and 'agreed_all': the date the customer named as YYYY-MM-DD (from the "
                         "calendar), exactly as named. Otherwise ''."},
@@ -275,7 +283,7 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
         *([when_eq("negotiate_more", "only statuses: next product", "commit", "go_more")] if per_product else []),
         when_eq(SEND, "only statuses: close", "commit", "go_end_r"),
         when_eq(SEND_NR, "only statuses: close", "commit", "go_end_nr"),
-        when_eq("commit_fix", "results not accepted or a proposal to say", "commit", "invalid", "invalid_say", "offer"),
+        when_eq("commit_fix", "results not accepted", "commit", "invalid", "invalid_say"),
     ] + post_extra
     task = texts.negotiate_task(spec)
 
@@ -288,7 +296,8 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
                    and not t.get("is_tool_call")]
     nodes["offer_step"] = code("offer_step", snip("next_offer(vars, RT, *json.loads(vars.get('offer_args') or '[]'))",
                                                   "vars['commit'] = 'invalid'"),
-                               [when_eq("propose_step", "every product settled", "commit", "propose_in")] + step_routes,
+                               [when_eq("negotiate_fix_say", "say the next proposal", "offer_go", "say"),
+                                when_eq("propose_step", "every product settled", "commit", "propose_in")] + step_routes,
                                "commit_fix")
     nodes["propose_step"] = code("propose_step", snip("propose_results(vars, RT, vars.get('propose_args', ''))",
                                                       "vars['commit'] = 'invalid'"), step_routes, "commit_fix")

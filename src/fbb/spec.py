@@ -173,6 +173,8 @@ class Negotiation(Strict):
     attempts: list[Attempt]
     rules: list[str] = Field(..., description="Müzakere kuralları, kısa emir cümleleri (tarih, tutar, ikna, ret tanımı)")
     forbidden_offers: list[str] = Field(default_factory=list)
+    hardship_status: str = Field("", description="Brief zorlukta (hastalık, ölüm, işsizlik…) bir transfer teklifi "
+                                 "istiyorsa, teklif reddedilince ürünlerin alacağı durum (statuses[].id); yoksa boş")
     floor_note: str = Field("", description="Floor (ya da borçtan düşük bir tutar) ilk kez teklif edilirken brief'in "
                             "söylenmesini istediği cümle, ör. kalan borcun gecikmiş kalacağı; yoksa boş")
 
@@ -471,6 +473,9 @@ def cross_check(spec: PolicySpec, cat: ToolCatalog) -> list[str]:
         for role in ("product_id", "product_type", "past_due", "days_late"):
             if getattr(rf, role) not in items:
                 errs.append(f"cevap alanı {role}: '{getattr(rf, role)}' get_account ürünlerinde yok")
+    hs = spec.negotiation.hardship_status
+    if hs and hs not in [st.id for st in spec.statuses]:
+        errs.append(f"negotiation.hardship_status: '{hs}' statuses içinde yok")
     for tool, consts in spec.tool_constants.items():
         if not cat.has(tool):
             errs.append(f"tool_constants: bilinmeyen tool {tool}")
@@ -507,6 +512,7 @@ def to_runtime(spec: PolicySpec) -> dict:
         "first_ask_single": spec.negotiation.first_ask_single,
         "first_ask_multi": spec.negotiation.first_ask_multi or spec.negotiation.first_ask_single,
         "floor_note": spec.negotiation.floor_note,
+        "hardship_status": spec.negotiation.hardship_status,
         "refused_status": next((st.id for st in spec.statuses if st.persuade),
                                spec.statuses[0].id if spec.statuses else "refused"),
         "attempts": [a.model_dump() for a in spec.negotiation.attempts],

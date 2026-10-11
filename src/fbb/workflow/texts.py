@@ -37,6 +37,11 @@ def system_prompt(spec: PolicySpec) -> str:
                  f'"{o.unknown_answer or "I do not have that information."}" Never invent figures, dates or reasons.')
     lines += [
         "- After every tool result, either speak to the customer or call the next tool. Never end a turn with nothing.",
+        "- If a message contains the answer to your question, act on that answer at once, even if the message is cut "
+        "off after it. Only if a cut-off message (it stops in the middle of a sentence, or ends with a comma or "
+        "'and') contains no answer yet, reply with a very short acknowledgement and vary it each time (\"Mm-hm.\", \"I'm listening.\", \"Take your time.\"). To a complete sentence of small talk reply warmly in a few words "
+        "(e.g. \"I understand.\") and wait. Never repeat your question or a proposal to a cut-off or off-topic "
+        "message.",
         "- Call only the tools of the current step, one tool per message.",
         "- Never say goodbye or end the call yourself: the system ends the call with the closing words.",
     ]
@@ -91,12 +96,15 @@ def identity_task(spec: PolicySpec, spoken: str) -> str:
         f'This step is the security check. You have just said: "{tpl(spoken)}"',
         "- When the customer answers that question, call submit_answer with their answer exactly as they said it "
         "(words are fine, do not convert). Do not speak before the call. Never guess or fill in an answer yourself.",
-        "- If a message contains an answer AND a question or complaint, it is an answer: call submit_answer first. "
+        "- If a message contains an answer AND a question, a complaint or a cut-off sentence, it is an answer: call "
+        "submit_answer first. "
         "Only a message with no answer at all can count as refusing.",
         "- If they give only part of a number or a date, call submit_answer with that part anyway: the system keeps "
         "it and asks for the rest. Call submit_answer again with whatever they add.",
         "- Never stall or say you are waiting or have a technical issue: every answer goes to submit_answer at once.",
-        "- If they ask a question back, answer it briefly in one sentence and ask the security question again.",
+        "- If they ask a question back, answer it briefly in one sentence and stop: do NOT repeat the security "
+        "question (every repetition counts as asking it again); they will answer next. Only if they then say "
+        "nothing about it, ask it once more.",
         f"- If they refuse to answer the security question, call decline_questions. Do not speak before the call: the "
         f"system says what is needed.{purpose}",
         "- Never say why you are calling and never mention any product or amount in this step.",
@@ -162,6 +170,10 @@ def negotiate_task(spec: PolicySpec) -> str:
            "says so)" if mp.enabled else "")
         + ". If they talk about a later product first, keep it in mind and still answer for the current product "
         "first.",
+        ("- Hardship (" + next((st.trigger for st in spec.statuses if st.id == n.hardship_status), "")
+         + "): follow the rules above ONCE (one sentence of sympathy and the offer). If they accept, transfer. If "
+         "they decline, never offer it again: call next_offer with result='hardship' at once."
+         if n.hardship_status else ""),
         "- Statuses other than a refusal (" + ", ".join(st.id for st in spec.statuses if not st.persuade)
         + ") and transfers are not next_offer answers: handle them under the rules and call propose_results with "
         "every product.",
@@ -173,6 +185,10 @@ def negotiate_task(spec: PolicySpec) -> str:
         "",
         "TRANSFERS:",
         _transfers_text(spec),
+        "- When you offer a transfer (for example to a support team), offer it ONCE. If the customer declines it, "
+        "never mention it again, not even when they ask something else afterwards (a discount, a lower amount): "
+        "answer that in one short sentence without any new offer, then end that product with its status by "
+        "calling propose_results right away.",
         (f"- {cc.trigger} → call transition_to_cust_cb." if cc.enabled and "post_verify" in cc.stages else ""),
         "",
         "FINISHING THIS STEP (very important, this overrides any rule above about reading back or confirming):",

@@ -2,7 +2,7 @@
 
 Her fonksiyon `vars`'ı okur/yazar. Route'lar string bayraklara bakar (boolean'a değil):
 id_go: <cevabın geldiği node adı> | '' | fail      id_decl: close | explain_q<i> | ''
-commit: confirm | go_<adım> | invalid | invalid_say | offer | offer_in | propose_in | ''
+commit: confirm | go_<adım> | invalid | invalid_say | offer_in | propose_in | ''   offer_go: say | ''
 next_step: record | note | more | end_r | end_nr     cb_state: ok | invalid | gave_up | ''
 Bir node'dan çıkışı sağlayan bayrak, o node'a geri dönülmeden önce bir kod adımında temizlenir; yoksa bayrak
 eski değeriyle tekrar tetiklenir.
@@ -127,7 +127,8 @@ def id_fix(vars, RT):
     vars["id_partial"] = ""
     if vars.get("id_decl") == "explain":
         vars["id_decl"] = ""
-        vars["id_say"] = (ident.get("decline_explain", "") + " " + qs[idx]["ask"]).strip()
+        # soru tekrar edilmez: hakem her tekrarı ayrı bir soru sayıyor; müşteri açıklamadan sonra cevabı veriyor
+        vars["id_say"] = ident.get("decline_explain", "") or qs[idx]["ask"]
         return
     hint = first_set(vars, ["id_r_hint"])
     if hint and ident.get("swap_hint") and str(hint) == ident["swap_hint"]:
@@ -147,7 +148,11 @@ def id_fix(vars, RT):
 # --- müzakere sonucu --------------------------------------------------------------------------------------
 
 def propose_results(vars, RT, raw):
-    """propose_results: doğrula ve düzelt. Promise varsa read-back'e, yoksa doğrudan not/kapanışa."""
+    """propose_results: doğrula ve düzelt. Promise varsa read-back'e, yoksa doğrudan not/kapanışa.
+
+    Modelin listesinde olmayan ürünler next_offer'da zaten bitmişse (offers_json) oradan tamamlanır: model bir
+    üründe dispute/paid görünce önceki anlaşmaları tekrar yazmak zorunda kalmaz."""
+    raw = merge_offer_results(vars, raw)
     state, msg, customer = validate_results(vars, raw, RT)
     vars["commit_msg"] = msg
     vars["commit_say"] = customer
@@ -165,17 +170,34 @@ def propose_results(vars, RT, raw):
     vars["commit"] = "go_" + vars["next_step"]
 
 
+def merge_offer_results(vars, raw):
+    try:
+        state = json.loads(vars.get("offers_json") or "null") or dict()
+    except Exception:
+        state = dict()
+    finished = settled_ids(vars) if (vars.get("recorded_json") or "[]") != "[]" else []
+    done = [r for r in state.get("results") or [] if r.split(":", 1)[0] not in finished]
+    listed = [e["product_id"] for e in parse_results(raw)]
+    extra = [r for r in done if r.split(":", 1)[0] not in listed]
+    return "; ".join([x for x in [str(raw or "").strip()] + extra if x])
+
+
 def readback_reset(vars, RT):
     """Müşteri read-back'i onaylamadı: hiçbir şey kaydedilmedi, müzakereye dönülür."""
     vars["commit"] = ""
     vars["rec_queue"] = "[]"
+    # son next_offer'ı geri al: read-back'e götüren cevap yanlış anlaşılmış olabilir (ör. 'agreed_all' sadece bir
+    # ürün için söylenmişti); teklif sırası ve deneme sayıları kaldığı yerden sürer
+    if vars.get("offers_prev") is not None and str(vars.get("offers_json") or ""):
+        vars["offers_json"] = vars.get("offers_prev") or ""
     vars["fix_prompt"] = ("The customer did not confirm the read-back; nothing was recorded. Reply to what they just "
-                          "said and settle it under the rules. When everything is agreed again, call propose_results "
-                          "again.")
+                          "said. Then call next_offer again for the current product with what they really said "
+                          "(only 'agreed' for the products they agreed to; 'refused' for a flat no), or "
+                          "propose_results when a product ends with another status.")
 
 
 def commit_reset(vars):
-    vars["fix_kind"] = "say" if vars.get("commit") in ("invalid_say", "offer") else "model"
+    vars["fix_kind"] = "say" if vars.get("commit") == "invalid_say" else "model"
     vars["commit"] = ""
 
 
@@ -193,6 +215,14 @@ def offer_sentence(plan, k, low, st):
     return text, amount, att["date"]
 
 
+def unproposed(state):
+    """next_offer sonuçlarından henüz propose edilmemiş olanlar (per_product modunda bir kısmı önceden kaydedildi)."""
+    said = state.get("proposed") or []
+    rest = [r for r in state.get("results") or [] if r not in said]
+    state["proposed"] = said + rest
+    return "; ".join(rest)
+
+
 def next_offer(vars, RT, answer, amount="", date=""):
     """next_offer: müşterinin ŞU ANKİ ürüne cevabı: 'refused' (düz ret / cevap yok), 'too_much' (tam tutar fazla) ya
     da 'agreed' (amount + date).
@@ -205,6 +235,8 @@ def next_offer(vars, RT, answer, amount="", date=""):
         plans = json.loads(vars.get("plans_json") or "[]")
     except Exception:
         plans = []
+    vars["offer_go"] = ""
+    vars["offers_prev"] = vars.get("offers_json") or ""
     state = json.loads(vars.get("offers_json") or "null") or dict(cur=0, items=dict(), results=[])
     cur = int(state.get("cur", 0))
     if not plans or cur >= len(plans):
@@ -241,8 +273,8 @@ def next_offer(vars, RT, answer, amount="", date=""):
         for rest in plans[cur:]:
             state["results"].append(rest["product_id"] + ":" + str(rest["past_due"]) + ":" + when.isoformat())
         state["cur"] = len(plans)
+        vars["propose_args"] = unproposed(state)
         vars["offers_json"] = json.dumps(state)
-        vars["propose_args"] = "; ".join(state["results"])
         vars["commit"] = "propose_in"
         return
     if answer.startswith("agree"):
@@ -265,6 +297,16 @@ def next_offer(vars, RT, answer, amount="", date=""):
             vars["commit_msg"] = "NOT ACCEPTED, the customer was told: " + note
             return
         done = pid + ":" + str(value) + ":" + when.isoformat()
+    elif answer.startswith("hardship") and RT.get("hardship_status"):
+        # Zorluk: sempati ve destek teklifini model (brief kuralıyla) BİR kez yapar; müşteri reddedince kalan bütün
+        # ürünler ikna denemesi olmadan zorluk durumuyla biter. Teklif burada tekrar söylenmez.
+        for rest in plans[cur:]:
+            state["results"].append(rest["product_id"] + ":" + RT["hardship_status"])
+        state["cur"] = len(plans)
+        vars["propose_args"] = unproposed(state)
+        vars["offers_json"] = json.dumps(state)
+        vars["commit"] = "propose_in"
+        return
     elif answer.startswith("too") and not st.get("low") and plan.get("floor") \
             and plan["floor"] < plan["past_due"] - 0.005:
         st["low"] = True
@@ -278,9 +320,26 @@ def next_offer(vars, RT, answer, amount="", date=""):
         state["results"].append(done)
         cur += 1
         state["cur"] = cur
-        if cur >= len(plans):
+        per_product = (RT.get("recording") or dict()).get("mode") == "per_product"
+        if per_product and done.count(":") >= 2:
+            # her ürün onaylanınca kaydedilir: bu promise (ve bekleyen durumlar) şimdi read-back'e; kayıttan sonra
+            # sıradaki ürünün ilk teklifi 'kaydedildi' cümlesiyle birlikte söylenir (next_step → negotiate_more)
+            nxt = ""
+            if cur < len(plans):
+                plan = plans[cur]
+                st = state["items"].get(plan["product_id"]) or dict(n=0, low=False)
+                st["n"] = 1
+                state["items"][plan["product_id"]] = st
+                text, _, _ = offer_sentence(plan, 1, st.get("low"), st)
+                nxt = (plan.get("continue_say", "") + " " + text).strip()
+            vars["next_offer_say"] = nxt
+            vars["propose_args"] = unproposed(state)
             vars["offers_json"] = json.dumps(state)
-            vars["propose_args"] = "; ".join(state["results"])
+            vars["commit"] = "propose_in"
+            return
+        if cur >= len(plans):
+            vars["propose_args"] = unproposed(state)
+            vars["offers_json"] = json.dumps(state)
             vars["commit"] = "propose_in"
             return
         plan = plans[cur]
@@ -291,7 +350,10 @@ def next_offer(vars, RT, answer, amount="", date=""):
         lead = plan.get("continue_say", "")
     text, amt, when = offer_sentence(plan, st["n"], st.get("low"), st)
     vars["offers_json"] = json.dumps(state)
-    vars["commit"] = "offer"
+    # bayrak burada temizlenir ve offer_step doğrudan teklif cümlesine gider (commit_fix adımı yok: her code
+    # node'u yük altında 2-4 sn; ret turu 3 adımla ~10 sn sessizlik yapıyordu)
+    vars["commit"] = ""
+    vars["offer_go"] = "say"
     vars["commit_say"] = (lead + " " + text).strip()
     vars["commit_msg"] = ("The system just proposed for " + pid + " (" + plan.get("wording", pid) + "): " + str(amt)
                           + " on " + when + ". It is now the current product.")
@@ -460,7 +522,9 @@ def next_step(vars, RT):
         rest = unsettled_plans(vars)
         if rest:
             parts = announce(vars, RT)
-            parts.append(say(RT, "continue_with", {"product": rest[0].get("wording") or rest[0]["product_id"]}))
+            nxt = str(vars.get("next_offer_say") or "")
+            vars["next_offer_say"] = ""
+            parts.append(nxt or say(RT, "continue_with", {"product": rest[0].get("wording") or rest[0]["product_id"]}))
             values = dict((k, vars.get(k, "")) for k in RT.get("call_vars", []))
             vars["progress_say"] = fill(" ".join(x.strip() for x in parts if x and x.strip()), values)
             vars["next_step"] = "more"

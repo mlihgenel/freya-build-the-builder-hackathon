@@ -27,6 +27,7 @@ SCORE = (
     "multi_product.enabled", "multi_product.notes_enabled", "multi_product.no_notes_on_transfer",
     "customer_callback.enabled", "customer_callback.outcome", "customer_callback.stages", "customer_callback.window",
     "tool_constants", "tool_fields", "response_fields", "money", "call_variables.customer_id", "call_variables.now",
+    "negotiation.hardship_status",
 )
 # Brief'in birebir istediği cümleler: hakem bunları arar.
 VERBATIM = (

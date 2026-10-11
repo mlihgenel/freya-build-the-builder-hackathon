@@ -276,3 +276,10 @@ def test_differential_deadlines(ns, rt_a):
         day = start + datetime.timedelta(days=i)
         for n in (1, 7, 12):
             assert ns["add_business_days"](day, n, cal) == brute(day, n)
+
+
+def test_lone_number_is_partial_date(ns):
+    """asks_back PUB-03: 'It is 1…' doğrulamaya gitmesin, sistem kalanını sorsun."""
+    assert ns["normalize_answer"]("date", "It is 1")[1] == "partial"
+    assert ns["normalize_answer"]("date", "I don't know")[1] == "unreadable"
+    assert ns["combine_answer"]({"answer_type": "date"}, "12 July 1991", "1") == ("1991-07-12", "ok")
