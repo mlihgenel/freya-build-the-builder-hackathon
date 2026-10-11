@@ -33,10 +33,12 @@ def main() -> None:
 
     from fbb.build import BuildOptions, run_build
 
-    # sadece geliştirme/test için: FBB_SPEC (hazır spec, LLM yok), FBB_NO_DEPLOY=1 (Freya'ya gönderme)
+    # sadece geliştirme/test için: FBB_SPEC (hazır spec, LLM yok), FBB_NO_DEPLOY=1 (Freya'ya gönderme),
+    # FBB_NO_REFINE=1 (chat testi + düzeltme aşamasını atla)
     res = run_build(BuildOptions(briefs=[case], tools="", slot=slot, base_url=mock,
                                  spec_file=os.environ.get("FBB_SPEC", ""),
-                                 deploy=not os.environ.get("FBB_NO_DEPLOY")))
+                                 deploy=not os.environ.get("FBB_NO_DEPLOY"),
+                                 refine=not os.environ.get("FBB_NO_REFINE")))
     print(json.dumps(res, indent=1, ensure_ascii=False))
 
 

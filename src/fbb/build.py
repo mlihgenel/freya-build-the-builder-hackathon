@@ -29,6 +29,7 @@ class BuildOptions:
     selftest: str = "none"       # none | smoke | cases:A | cases:B
     reps: int = 1
     base_url: str = ""           # verilirse tool API'sinin sunucusu (final: kendi mock'umuz)
+    refine: bool = True          # genel yol: kayıttan sonra chat testi + düzeltme aşaması (fbb.refine)
     notes: list[str] = field(default_factory=list)
 
 
@@ -179,6 +180,9 @@ def _run_generic(opts: BuildOptions, slot: str, trace: Trace, cat, tools_path: s
     ids = kitapi.save(slot, wf)
     trace.event("freya_saved", f"workflow {ids['workflow_id']} agent {ids['agent_id']}", **ids)
     result.update(ids)
+    budget = REFINE_UNTIL_S - trace.elapsed()
+    if opts.base_url and opts.refine and budget > 180:
+        wf = _refined(opts, slot, trace, wf_path, wf, budget)
     stored = kitapi.get(ids["workflow_id"])["workflow"]
     lost = _diff_stored(wf, stored)
     trace.event("freya_readback", f"platformda saklanan workflow kontrol edildi ({len(lost)} fark)", lost=lost)
@@ -187,6 +191,34 @@ def _run_generic(opts: BuildOptions, slot: str, trace: Trace, cat, tools_path: s
     result["export"] = str(export_path)
     trace.event("end", f"build bitti: {trace.elapsed():.0f} s, {trace.model_calls} model çağrısı, ${trace.cost_usd:.2f}")
     return result
+
+
+REFINE_UNTIL_S = 25 * 60  # brief başına 30 dk sınırı: refine en geç build'in 25. dakikasında biter
+
+
+def _refined(opts: BuildOptions, slot: str, trace: Trace, wf_path: Path, wf: dict, budget: float) -> dict:
+    """Refine aşaması (fbb.refine): Claude chat ile test edip düzeltir. Sonuç yerel kontrol + dryRun'dan geçerse
+    kaydedilir ve `wf_path`'e yazılır; geçmezse ilk sürüm kalır (son başarılı kayıt geri yüklenir)."""
+    from fbb import kitapi
+    from fbb.agent_tools import local_check
+    from fbb.refine import refine
+
+    try:
+        new_path = refine(opts.briefs, wf_path, opts.base_url, slot, trace, budget)
+        new = json.loads(new_path.read_text())
+        problems = local_check(new)
+        if not problems:
+            kitapi.validate(f"{slot} dry-run", new)
+    except Exception as e:  # refine hiçbir durumda build'i düşürmez
+        problems = [f"{type(e).__name__}: {str(e)[:300]}"]
+    if problems:
+        trace.event("refine_rejected", f"{len(problems)} sorun: ilk sürüm kalıyor", problems=problems)
+        kitapi.save(slot, wf)
+        return wf
+    kitapi.save(slot, new)
+    wf_path.write_text(json.dumps(new, indent=1, ensure_ascii=False))
+    trace.event("refine_saved", f"{len(new.get('nodes', {}))} node, hash {workflow_hash(new)}", path=str(wf_path))
+    return new
 
 
 def with_base(mock_url: str, server_url: str) -> str:
