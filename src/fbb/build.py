@@ -140,7 +140,12 @@ def _run_generic(opts: BuildOptions, slot: str, trace: Trace, cat, tools_path: s
     previous = ""
     wf: dict = {}
     warnings: list[str] = []
-    for attempt in range(3):
+    agentic = bool(opts.base_url and opts.deploy and opts.refine)
+    if agentic:  # ajan modu: Claude workflow'u dosyaya yazar, kaydeder, mock'a karşı chat ile test eder, düzeltir
+        wf = _agentic_write(opts, slot, trace, tools_path)
+        if not wf:
+            trace.event("mode", "ajan modu geçerli workflow bırakmadı: tek seferlik yazıma dönülüyor")
+    for attempt in range(0 if wf else 3):
         out = write_workflow(docs, api_text, cat.base_url, trace, problems or None, previous)
         try:
             wf = json.loads(out.workflow_json)
@@ -181,7 +186,7 @@ def _run_generic(opts: BuildOptions, slot: str, trace: Trace, cat, tools_path: s
     trace.event("freya_saved", f"workflow {ids['workflow_id']} agent {ids['agent_id']}", **ids)
     result.update(ids)
     budget = REFINE_UNTIL_S - trace.elapsed()
-    if opts.base_url and opts.refine and budget > 180:
+    if not agentic and opts.base_url and opts.refine and budget > 180:
         wf = _refined(opts, slot, trace, wf_path, wf, budget)
     stored = kitapi.get(ids["workflow_id"])["workflow"]
     lost = _diff_stored(wf, stored)
@@ -194,6 +199,25 @@ def _run_generic(opts: BuildOptions, slot: str, trace: Trace, cat, tools_path: s
 
 
 REFINE_UNTIL_S = 25 * 60  # brief başına 30 dk sınırı: refine en geç build'in 25. dakikasında biter
+
+
+def _agentic_write(opts: BuildOptions, slot: str, trace: Trace, tools_path: str) -> dict:
+    """Ajan modu (fbb.refine, ilk sürüm yokken): Claude workflow'u baştan yazar ve chat ile test eder. Bıraktığı dosya
+    yerel kontrol + lint + dryRun'dan geçerse döner; geçmezse boş sözlük (tek seferlik yazım devreye girer)."""
+    from fbb import kitapi
+    from fbb.agent_tools import local_check
+    from fbb.refine import refine
+
+    try:
+        path = refine(opts.briefs, None, opts.base_url, slot, trace, REFINE_UNTIL_S - trace.elapsed(), api=tools_path)
+        wf = json.loads(path.read_text())
+        problems = local_check(wf)
+        if not problems:
+            kitapi.validate(f"{slot} dry-run", wf)
+    except Exception as e:  # ajan hiçbir durumda build'i düşürmez
+        problems = [f"{type(e).__name__}: {str(e)[:300]}"]
+    trace.event("agentic_result", f"{len(problems)} sorun", problems=problems)
+    return {} if problems else wf
 
 
 def _refined(opts: BuildOptions, slot: str, trace: Trace, wf_path: Path, wf: dict, budget: float) -> dict:

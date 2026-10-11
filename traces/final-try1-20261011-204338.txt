@@ -1,0 +1,5 @@
+[2026-10-11T20:43:38+0300 +   0.0s] start: build başladı: slot=final-try1
+[2026-10-11T20:44:50+0300 +  71.1s] model_call: claude-opus-5-5 — vaka belgeleri → API (OpenAPI) (deneme 1) (71 s, $1.105)
+[2026-10-11T20:44:50+0300 +  71.1s] generic_api: 7 yol çıkarıldı
+[2026-10-11T20:44:50+0300 +  71.1s] tools: 7 tool, base https://yz50-bank-mock.kirgilmert.workers.dev/voice/v1
+[2026-10-11T20:44:50+0300 +  71.1s] mode: vaka tahsilat formatında değil (yedi tahsilat tool'u yok): genel yol, workflow'u Claude yazar

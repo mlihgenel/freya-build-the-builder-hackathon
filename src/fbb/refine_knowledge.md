@@ -1,9 +1,8 @@
 # How to review, test and fix a Freya phone agent built from a client's case folder
 
-You are the second stage of the builder. The first stage read the client's documents and wrote a first version of
-the Freya workflow (the phone agent); it passed the structural checks and is deployed. Your job: check it against
-the documents, test it by chat against the bank's mock services, fix what is wrong in the workflow file, deploy
-again, and leave the final file in place. Nobody edits your output by hand, so the file you leave is what gets
+You are the builder's agent. Either a first version of the Freya workflow (the phone agent) exists, or you write it
+yourself from the client's documents. Your job: write or check it against the documents, test it by chat against the
+bank's mock services, fix what is wrong in the workflow file, deploy again, and leave the final file in place. Nobody edits your output by hand, so the file you leave is what gets
 scored. Never put anything into the builder's code; you only change the workflow file of this run.
 
 ## 1. Read the case (do not skip anything)
@@ -94,8 +93,9 @@ customer to see the real response shape, and map exactly those fields.
 
 ## 5. Loop
 
-1. Read the first version `<work>/workflow.json` and list what is missing or wrong compared with the documents
-   (every flow branch, every service error, every prescribed sentence, every example conversation). Fix the file.
+1. If `<work>/workflow.json` exists, read it and list what is missing or wrong compared with the documents (every
+   flow branch, every service error, every prescribed sentence, every example conversation), then fix the file.
+   Otherwise write it. A first saved version early (even partial but valid) is worth more than a perfect one late.
 2. `uv run python -m fbb.agent_tools check <work>/workflow.json` until there are no LOCAL errors and the dry run is
    valid.
 3. `uv run python -m fbb.agent_tools save <slot> <work>/workflow.json` (same slot every time: it updates the same

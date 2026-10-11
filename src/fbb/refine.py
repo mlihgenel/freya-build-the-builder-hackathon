@@ -18,11 +18,16 @@ from fbb.trace import Trace, redact
 KNOWLEDGE = Path(__file__).with_name("refine_knowledge.md")
 
 
-def _prompt(cases: list[str], work: Path, mock_url: str, slot: str, minutes: int) -> str:
-    return f"""Review, test and fix the phone agent built from this client case.
+def _prompt(cases: list[str], work: Path, mock_url: str, slot: str, minutes: int, first: bool, api: str) -> str:
+    state = (f"- There is no workflow yet: read the whole case, then write the first version to {work / 'workflow.json'}"
+             f" (write it in several steps if it is long), check and save it early, then test and fix.\n"
+             if not first else
+             f"- First version of the workflow (already deployed to slot `{slot}`): {work / 'workflow.json'}\n")
+    return f"""Build, test and fix the phone agent for this client case.
 
 - Case folder(s) (original files; open PDFs and images with the Read tool): {', '.join(cases)}
-- First version of the workflow (already deployed to slot `{slot}`): {work / 'workflow.json'}
+{state}- The bank's service API as the builder extracted it from the documents (OpenAPI; check it against the
+  documents): {api}
 - Your work folder: {work} — keep the workflow in {work / 'workflow.json'}; write your decisions to {work / 'DECISIONS.md'}
 - Mock address of the bank's services (every tool URL starts with it): {mock_url}
 - Slot name for save/chat: {slot}
@@ -69,17 +74,21 @@ async def _agent(prompt: str, trace: Trace, model: str, timeout_s: float) -> dic
     return summary
 
 
-def refine(cases: list[str], wf_path: Path, mock_url: str, slot: str, trace: Trace, budget_s: float) -> Path:
-    """`wf_path`'teki workflow'u Claude'a test ettirip düzelttirir. Dönen yol: son geçerli workflow dosyası."""
+def refine(cases: list[str], wf_path: Path | None, mock_url: str, slot: str, trace: Trace, budget_s: float,
+           api: str = "") -> Path:
+    """`wf_path`'teki workflow'u Claude'a test ettirip düzelttirir; `wf_path` yoksa workflow'u Claude baştan yazar.
+    Dönen yol: Claude'un bıraktığı workflow dosyası (olmayabilir)."""
     work = config.OUT / f"{slot}-refine"
     work.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(wf_path, work / "workflow.json")
+    (work / "workflow.json").unlink(missing_ok=True)
+    if wf_path is not None:
+        shutil.copy2(wf_path, work / "workflow.json")
     os.environ["FBB_MOCK_URL"] = mock_url
     model = config.builder_model()
     trace.event("refine_start", f"chat test + fix, budget {budget_s / 60:.0f} min, model {model}")
     t0 = time.time()
-    summary = asyncio.run(_agent(_prompt(cases, work, mock_url, slot, int(budget_s // 60)), trace, model, budget_s))
-    trace.model_call(model, "refine: review against the case, chat-test on the mock, fix the workflow",
+    summary = asyncio.run(_agent(_prompt(cases, work, mock_url, slot, int(budget_s // 60), wf_path is not None, api), trace, model, budget_s))
+    trace.model_call(model, "agentic build: " + ("review" if wf_path else "write") + " the workflow, chat-test it on the mock, fix it",
                      seconds=time.time() - t0, cost_usd=summary.get("cost"), ok=not summary.get("error"))
     trace.event("refine_done", json.dumps(summary, ensure_ascii=False)[:600])
     return work / "workflow.json"
