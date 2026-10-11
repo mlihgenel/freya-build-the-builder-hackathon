@@ -129,7 +129,7 @@ def negotiate_task(spec: PolicySpec) -> str:
     n, c, mp = spec.negotiation, spec.confirmation, spec.multi_product
     cc = spec.customer_callback
     per_product = spec.recording.mode == "per_product"
-    statuses = "\n".join(f'  - {s.id}: {s.trigger}' + (f' Say: "{s.say}"' if s.say else "") for s in spec.statuses)
+    statuses = "\n".join(f'  - {s.id}: {s.trigger}' + (f' (the system then says: "{s.say}"; do not say it yourself)' if s.say else "") for s in spec.statuses)
     parts = [
         "The customer is verified. You have just told them: \"{{debt_statement}} {{first_ask}}\"",
         "",

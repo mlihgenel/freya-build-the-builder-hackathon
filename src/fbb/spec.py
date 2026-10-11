@@ -594,6 +594,7 @@ def to_runtime(spec: PolicySpec) -> dict:
         "callback": spec.third_party.callback.model_dump(),
         "customer_callback": (cc.window or spec.third_party.callback).model_dump(),
         "status_reasons": status_reasons,
+        "status_say": {st.id: st.say for st in spec.statuses if st.say},
         "identity": {
             "questions": [q.model_dump() for q in spec.identity.questions],
             "numeric_date_order": spec.identity.numeric_date_order,

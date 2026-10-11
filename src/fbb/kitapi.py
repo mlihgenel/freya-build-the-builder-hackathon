@@ -134,7 +134,7 @@ def ledger(customer_id: str) -> dict:
 
 
 def run_cases(agent_id: str, *, brief: str = "", only: str = "", reps: int = 1, style: str = "",
-              out: Path | None = None, timeout_s: int = 3600) -> dict:
+              out: Path | None = None, timeout_s: int = 3600, rerun_if_slow: int = 0) -> dict:
     """Kitin run_cases.py'sini çalıştırır; --out JSON'unu döner."""
     config.load_env()
     import time
@@ -150,6 +150,8 @@ def run_cases(agent_id: str, *, brief: str = "", only: str = "", reps: int = 1, 
         cmd += ["--reps", str(reps)]
     if style:
         cmd += ["--style", style]
+    if rerun_if_slow:  # kitin seçeneği: medyan en yavaş tur 10 sn'yi aşan koşu atılır, 5 dk sonra tekrarlanır
+        cmd += ["--rerun-if-slow", str(rerun_if_slow)]
     proc = subprocess.run(cmd, cwd=config.KIT, capture_output=True, text=True, timeout=timeout_s, env=os.environ.copy())
     result = json.loads(out.read_text()) if out.exists() else {}
     result["stdout"] = proc.stdout[-6000:] + f"\nsonuç dosyası: {out}\n" + (proc.stderr[-2000:] if proc.returncode else "")

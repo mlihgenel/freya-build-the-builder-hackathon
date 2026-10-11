@@ -1207,3 +1207,15 @@ def test_single_result_code_close_and_datetime_callback(public_cases):
     w = {"id_state": "verified", "statuses_json": json.dumps([{"product_id": "p1", "reason": "paid"}])}
     run_snippet(_code_of(n["close_final"]), vars=w)
     assert w["close_outcome"] == "PAID"
+
+
+def test_status_sentence_is_said_by_the_system(cat, public_cases):
+    """Faz 7, LLM spec'li A (PUB-08): model propose_results'tan önce konuşmadığı için 'ödemeler bir iş günü içinde
+    görünür' cümlesi hiç söylenmedi. Durumun cümlesini kapanış konuşması söyler, bir kez."""
+    s = spec("spec_a.json")
+    n = build_workflow(s, cat)["nodes"]
+    v = {}
+    _account(n, v, public_cases["PUB-08"], "spec_a")
+    assert _propose(n, v, "p1:paid") == "send_close_nr"
+    paid = [x.say for x in s.statuses if x.id == "paid"][0]
+    assert v["closing_speech"].startswith(paid) and v["closing_speech"].count(paid) == 1

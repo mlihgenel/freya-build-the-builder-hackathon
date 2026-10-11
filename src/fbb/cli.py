@@ -56,6 +56,8 @@ def main(argv: list[str] | None = None) -> None:
     c.add_argument("--only", default="")
     c.add_argument("--reps", type=int, default=1)
     c.add_argument("--style", default="")
+    c.add_argument("--rerun-if-slow", type=int, default=0,
+                   help="kitin seçeneği: model yavaşken yapılan koşuyu at, 5 dk sonra tekrarla (en fazla N kez)")
     h = sub.add_parser("chat", help="yayınlanmış workflow ile tek tur sohbet")
     h.add_argument("slot")
     h.add_argument("message")
@@ -103,7 +105,8 @@ def main(argv: list[str] | None = None) -> None:
                     print("   -", reason[:300])
         return
     if a.cmd == "cases":
-        res = kitapi.run_cases(kitapi.agent_for(a.agent_id), brief=a.brief, only=a.only, reps=a.reps, style=a.style)
+        res = kitapi.run_cases(kitapi.agent_for(a.agent_id), brief=a.brief, only=a.only, reps=a.reps, style=a.style,
+                               rerun_if_slow=a.rerun_if_slow)
         print(res.get("stdout", ""))
     elif a.cmd == "chat":
         state = json.loads(kitapi.STATE_FILE.read_text())

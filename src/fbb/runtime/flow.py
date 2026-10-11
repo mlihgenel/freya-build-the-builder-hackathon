@@ -591,6 +591,17 @@ def announce(vars, RT):
     if names:
         parts.append(RT["recording"]["failure_sentence"] + (" (" + ", ".join(n for n in names if n) + ")"
                                                             if any(names) and len(plans) > 1 else ""))
+    # durum cümleleri (ör. 'ödemeler bir iş günü içinde görünür'): model propose_results'tan önce konuşmadığı için
+    # brief'in istediği cümleyi sistem söyler; aynı cümle bir kez
+    texts = []
+    for st in json.loads(vars.get("statuses_json") or "[]"):
+        line = (RT.get("status_say") or dict()).get(st.get("reason"), "")
+        if not line or "s:" + st["product_id"] in said:
+            continue
+        said.append("s:" + st["product_id"])
+        if line not in texts:
+            texts.append(line)
+    parts = texts + parts
     vars["announced_json"] = json.dumps(said)
     return parts
 
