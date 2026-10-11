@@ -42,14 +42,22 @@
    uv run build-agent final/<x>/brief.md --tools final/<x>/openapi.json --slot chk-<x> --no-deploy
    uv run fbb specdiff out/chk-<x>.spec.json out/final-<x>.spec.json
    ```
-   PUAN farkı varsa iki değerden hangisinin brief'e uyduğuna bakılır. Asıl spec yanlışsa genel bir prompt düzeltmesi
+   PUAN farkı varsa iki değerden hangisinin brief'e uyduğuna bakılır. 11 Eki 18:36 provasında (Brief E ve G) görülen
+   ve **zararsız** çıkan fark türleri:
+   - Tarihli memo iki çıkarımda ters yönden yazılmış: biri "ana değer X, şu tarihe kadar Y", öteki "ana değer Y, şu
+     tarihten itibaren X". Anlam aynıysa ikisi de doğrudur.
+   - `tool_fields` eşlemesinin birinde boş olması: builder eksik eşlemeyi kendisi tamamlıyor. Şüphede iki spec'ten
+     üretilen gövdeyi karşılaştır (`out/<slot>.workflow.json` içinde ilgili `pre_actions` gövdesi).
+   - `closing.hangup_unverified` / `hangup_verified`: brief tanımlamıyorsa (`unmapped`'te not vardır) karar değil.
+   Süre (prova): iki brief için asıl build + kontrol çıkarımı aynı anda **~2,5 dk**, ~$3,3. Asıl spec yanlışsa genel bir prompt düzeltmesi
    yapılıp build tekrarlanır (BUGFIX_LOG). 11 Eki provası: C ve D'de iki çıkarım 0 PUAN farkı.
 4. **20:15** Ham materyal brief'i: bütün dosyalar sırayla verilir (mail, poliçe, memo, kod listesi; ilgili sırayla).
 5. **20:30** Gözle kontrol:
    - `out/<slot>.spec.json`: tatiller, bantlar, kimlik soruları, outcome tablosu brief'le aynı mı?
    - Hata varsa sadece **genel** bir bug fix yapılır ve `BUGFIX_LOG.md`'ye yazılır. Brief'ten değer **yazılmaz**.
    - Builder yeniden çalıştırılır.
-6. **21:00** Chat smoke:
+6. **21:00** Chat smoke (workspace'te **çalışan simülasyon yokken**: 11 Eki 18:40'ta simülasyon çalışırken chat bilinen
+   sağlam agent'ta da 504 verdi; o durumda tek vakalık simülasyon `fbb cases final-<x> --only PUB-02` kullanılır):
    ```bash
    uv run fbb chat final-<x> "Hello?" --case PUB-01
    ```
