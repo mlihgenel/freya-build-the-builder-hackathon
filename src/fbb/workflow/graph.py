@@ -343,7 +343,8 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
     c = spec.confirmation
     nodes["readback"] = conversation(
         "readback", texts.readback_task(spec), on_enter={"type": "tts", "text": "{{readback_say}}"},
-        transitions=[intent("record_promise", f'The customer clearly says yes to "{c.confirm_question}".'),
+        transitions=[intent("record_promise", f'The customer clearly says yes to "{c.confirm_question}" and asks no '
+                                              'question in the same message.'),
                      intent("readback_reset", "The customer does not confirm, says no, or wants to change an amount, "
                                               "a date or a product.")] + post_extra,
         max_turns=8, max_turn_target="readback_reset")

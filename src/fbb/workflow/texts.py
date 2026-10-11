@@ -225,7 +225,8 @@ def readback_task(spec: PolicySpec) -> str:
     return "\n".join([
         "You have just read the customer's promises back and asked for confirmation: \"{{readback_say}}\"",
         "No tool call is allowed in this step; the system acts on the customer's answer.",
-        f'- If the customer asks a question, answer it in one short sentence and ask "{c.confirm_question}" again.',
+        f'- If the customer asks a question (also together with a yes), answer it in one short sentence and ask '
+        f'"{c.confirm_question}" again.',
         "- Never change an amount or a date yourself and never say that anything is recorded or saved.",
         bullets(c.rules),
         "TRANSFERS:",
