@@ -5,7 +5,7 @@
 > - Yarım kalan madde `[~]` ile işaretlenir ve ne kaldığı yazılır.
 > - **"📍 Şu an"** satırı her adımda güncellenir.
 
-**📍 Şu an (11 Eki ~11:05):** Adım 0–2 ✅ (teslim provası, `fbb scenarios`), Faz 3 ✅ (3.2/3.4/3.5/3.6 + canlı bulunan 3.9), Faz 5.1–5.2 ✅. Sıradaki: 5.3 chat provası (açılış cümlesi sorusu), SC-04/05 `--reps 3`, A regresyonu, stiller.
+**📍 Şu an (11 Eki ~13:10):** Faz 1–6 ✅ (6.4/6.5 kullanıcıda: final makinesinde mock `curl`, panelde kredi). Senaryolar SC-01..05 pass³ (SC-01 2/2 + platform iptali). Stiller son kodla A 39/40, B 12/12. Koşuyor: `check_offer_answer` + cevaplanmamış soru kuralı sonrası A/B `--reps 3`. Sıradaki: Faz 7 (17:00).
 
 **Önceki (05:00):** Faz 4 ✅, Faz 2 ✅, Faz 3.1/3.3 ✅ (11 Eki ~05:00). Son sürüm: A 10/10 ve B 3/3 pass³, talkative A 10/10 · B 3/3, PUB-05 dört stilde 4/4. Sıradaki: Faz 3.2 (müşteri callback'i canlı), Faz 5 (Brief C/D provası), Faz 6.
 
@@ -66,6 +66,7 @@ Amaç: finale en yakın testleri koşmak, sorunları **genel** olarak düzeltmek
 - [x] 2.5 `talkative`: A ×1, B ×1
 - [x] 2.6 Düşen her vakanın transcript analizi ve sınıflandırması (`docs/10` §6)
 - [x] 2.7 Düzeltmeler: önce `--only X --style Y --reps 3`, sonra bütün brief `--reps 3`
+- [x] 2.8 (11 Eki 11:20–12:15) Son kodla 4 stil × A/B, bütün brief ×1: in_words 10/10 · 3/3, pieces 10/10 · 3/3, asks_back 9/10 · 3/3, corrects 10/10 · 3/3 (talkative 05:00'te 10/10 · 3/3). Tek düşüş asks_back PUB-04: kod adımı sırasında sorulan "robot musun?" cevapsız kaldı → sistem prompt'una genel kural
 
 **Sonuç (11 Eki ~03:00–04:30, Mert):** ilk tur (×1): pieces 8/10 · 3/3; in_words 10/10 · 3/3; asks_back 8/10 · 2/3; corrects 10/10 · 2/3; talkative 7/10 · 2/3. Düşenlerin transcript'leri okundu; düzeltmeler (hepsi genel, testli):
 - **Kimlik:** ay içermeyen tek sayı ("It is 1…") eksik cevap sayılır; ret açıklamasında ve geri soruya verilen cevapta güvenlik sorusu tekrarlanmaz (hakem her tekrarı ayrı soru sayıyordu); kimlik node'larında tur sınırı 12 → 30 (talkative'de sınır doluyordu).
@@ -95,6 +96,8 @@ Amaç: finale en yakın testleri koşmak, sorunları **genel** olarak düzeltmek
 - [x] 3.9 (11 Eki ~10:50) **Aynı turda iki tool / teklif sırasında durum** (SC-03, canlı bulundu): 'kartı yarın öderim, krediyi ödemem, araç kredisi benim değil' → model `next_offer(agreed p1)` + `propose_results(p3:dispute)`; ikincisi `commit`'i ezdi, p1 kayboldu, `negotiate_more` 70 kez kendine döndü. Düzeltme (genel, iki modda): tool'lar `offer_pending`/`propose_pending` işaretler, önce durumlar işlenir (`fold_statuses`: durumlar `offers_json`'a yazılır, teklif imleci `next_open` ile o ürünleri atlar), sonra teklif cevabı; `go_more` sadece kod adımından çıkar. Testler: `test_agree_one_and_dispute_another_in_one_turn_{per_product,batch}` (iki sıra), `test_status_for_current_product_moves_to_next_offer`. Canlı: SC-03 ✅, B 3/3
 - [x] 3.10 (11 Eki) Lint boyut sınırı hata → uyarı: dryRun 450 KB / 700 KB / 1,2 MB'ı kabul etti; 400 KB hatası gizli bir brief'i (callback + per_product + 3 bant ≈ 365 KB) boşuna durdurabilirdi
 - [x] 3.11 (11 Eki ~11:20) Callback: (1) `propose_callback` → `check_callback_time` (hakem pencere dışı bir *kontrol* çağrısını 'kurulmuş callback' saydı); (2) callback node'una girişte müşteri zamanı zaten söylediyse onay sorusu; (3) `customer_callback.no_callback_outcome` (yeni, isteğe bağlı): brief müşteriye geçerli zaman verilmezse ayrı bir kapanış istiyorsa (D kural 11) kendi sabit kapanışı; boşsa genel kapanış. Testler: `test_callback_day_only`, `test_customer_callback_no_callback_outcome`. PUB-02 ×3 3/3
+- [x] 3.12 (11 Eki ~12:10) `next_offer` → `check_offer_answer` (hakem `result='agreed'`'yi 'promise kaydedildi' saydı, SC-01 2/3). Yeni adla SC-01 2/2, SC-03 3/3
+- [x] 3.13 (11 Eki) Platform dayanıklılığı (`kitapi`, kit dosyası değişmez): GET'ler 5xx/ağ hatasında ~5 dk tekrar; 10 dk'yı aşan simülasyonu bekçi iptal eder (belgelenmemiş `POST /simulations/<id>/cancel`); `fbb cases` kit koşucusu aynı süreçte (`fbb.kit_runner`) ve 60 dk süre sınırıyla
 
 ## Faz 4: Farklı takvim günleri
 - [x] 4.1 Runtime birim testleri: Cuma 2026-10-16, Cuma 2026-10-23 (26 Ekim tatil öncesi) ve Çarşamba 2026-12-23 (yıl sonu tatilleri) için `prep_account` ve `day_table` beklentileri

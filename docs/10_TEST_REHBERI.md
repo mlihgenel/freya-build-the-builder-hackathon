@@ -258,6 +258,15 @@ staging-app.freyavoice.ai → çağrı kayıtları. Simülasyon çağrıları "S
 | 10:39–10:45 | dev-b / var-pp / var-cc | `fbb scenarios` SC-01..05 (ilk tur) | SC-01 ✅, SC-02 ✅, SC-03 ❌, SC-04 ❌, SC-05 ❌ | SC-03: model aynı turda `next_offer` + `propose_results` → p1 kayboldu, `negotiate_more` `go_more` ile 70 kez kendine döndü. SC-04: mock `no_promise/callback`'i reddetti (varyant spec hatası). SC-05: gün söylenince model saat sordu |
 | 10:53–10:56 | düzeltmeler (fold, go_more, gün-tek) | SC-01..05 | SC-01..04 ✅, SC-05 ❌ | SC-05: callback node'u müşterinin söylediği zamanı tekrar sordu → açılış onay sorusuna çevrildi |
 | 10:58 | dev-b (fold sürümü) | Brief B ×1 | **3/3** | |
+| 11:00 | dev-a (fold sürümü) | Brief A ×1 | **10/10** | |
+| 11:05 | dev-a (callback onay açılışı) | PUB-02 ×3 | **3/3** | |
+| 11:10–11:15 | var-cc, var-pp | SC-04/05 ×3, SC-02/03 ×3 | SC-04 3/3, SC-05 2/3, SC-02 3/3, SC-03 3/3 | SC-05: tekrar node'unun LLM açılışı reddedilen 20:00 için "I've scheduled a callback" dedi → kodda üretilen tts cümlesi |
+| 11:20–11:45 | dev-a / dev-b | stiller | in_words A 10/10 · B 3/3 | platform 502/503/504 kesintisi: pieces A/B, asks_back A/B, SC-01 ×3 sonuçsuz (koşucu çöktü) → kit api'sine GET tekrarı |
+| 11:53 | var-cc (tts tekrar cümlesi) | SC-04/05 ×3 | **3/3**, **3/3** | |
+| 11:56 | dev-b | SC-01 ×3 | 2/3 | hakem `next_offer(result='agreed')` çağrısını 'promise kaydedildi' saydı (ledger'da yok) → `check_offer_answer` |
+| 12:00–12:15 | dev-a / dev-b | pieces, asks_back, corrects | pieces A 10/10 · B 3/3; asks_back A 9/10 · B 3/3; corrects A 10/10 · B 3/3 | asks_back PUB-04: "Are you a robot?" kod adımı sırasında geldi, cevapsız kaldı (platform yarışı) → sistem prompt'una 'cevaplanmamış soruyu önce cevapla' |
+| 12:17–12:35 | dev-b / var-pp (check_offer_answer) | SC-01 ×3, SC-03 ×3 | SC-01 2/2 (3. tekrar platformda takıldı, iptal), SC-03 **3/3** | takılan simülasyon: çağrısı hiç başlamadı, 8+ dk `running` → `cancel` + bekçi |
+| 12:36–13:00 | dev-a / dev-b | A / B `--reps 3` | sonuçsuz | Freya API kesintisi (kimlikli çağrılar 504); A koşucusu 25 dk sınırına takıldı (→ 60 dk), B başlatılamadı |
 | 00:40 | dev-a-llm / dev-b-llm | Claude ile tam build (A, A+B) + `specdiff` | lint 0; PUAN farkı A 0, B 1 | B: `hangup_unverified` farkı (brief tanımlamıyor) |
 | 00:42 | dev-a-llm | Brief A × 3 | 9/10 | PUB-05 2/3: `propose_results` öncesi teselli tekrarı → texts kuralı |
 | 00:52 | dev-b-llm | Brief B × 3 | **3/3 pass³** | |
