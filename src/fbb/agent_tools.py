@@ -47,6 +47,10 @@ def local_check(wf: dict) -> list[str]:
     known = set(nodes) | set(wf.get("global_nodes") or {}) | {"__previous__"}
     if wf.get("initial_node") not in nodes:
         errs.append(f"initial_node {wf.get('initial_node')!r} is not a node")
+    elif nodes[wf["initial_node"]].get("node_type") == "api_request":
+        errs.append(f"initial_node {wf['initial_node']!r} is an api_request node: the platform skips the entry actions "
+                    "of the first node (measured: the service is never called). Put a passthrough code node first "
+                    "whose only job is an `always` transition into the first api_request node")
     mock = os.environ.get("FBB_MOCK_URL", "").rstrip("/")
     every = list(nodes.items()) + list((wf.get("global_nodes") or {}).items())
     for nid, n in every:
@@ -144,7 +148,16 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "call":
         from fbb.cli import print_call
 
-        print_call(kitapi.get_call(a.call_id), show_all=True)
+        call = kitapi.get_call(a.call_id)
+        print_call(call, show_all=True)
+        table: dict = {}
+        for m in call.get("messages") or []:
+            table.update((m.get("workflowSnapshot") or {}).get("variableTable") or {})
+        shown = {k: (v.get("value") if isinstance(v, dict) else v) for k, v in table.items()
+                 if ".header." not in k and not k.endswith(("_turns", ".current_turns"))}
+        print("VARIABLES at the end of the call (tool results are flattened into <tool>_response.* keys):")
+        for k, v in shown.items():
+            print(f"  {k} = {json.dumps(v, ensure_ascii=False)[:200]}")
         return 0
     if a.cmd == "end":
         print(json.dumps(kitapi.chat_end(a.call_id), ensure_ascii=False)[:2000])

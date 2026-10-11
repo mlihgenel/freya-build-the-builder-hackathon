@@ -36,6 +36,13 @@ Read `kit/docs/workflow-format.md`, `kit/docs/tools-and-code.md` and `kit/docs/a
 - An api call result arrives wrapped: `{status, data, message, status_code, header}`. Mapping paths start with
   `data.`. Booleans arrive as text ("true"/"True"): never route on a boolean, route on a string flag you set in code.
   Every result is also flattened into variables as `<tool>_response.data.*`.
+- Measured: the entry actions (`pre_actions`) of the **initial node** are not run, so an api_request as the first node
+  never calls the service. Start with a passthrough code node that only routes (`always`) into the first service
+  node; that node's call then runs. `check` reports it.
+- Measured: `response_mapping` to a list or object path (e.g. `data.data.items`) sets nothing; only leaf values map.
+  Lists arrive flattened: `<tool>_response.data.data.items.0.name`, `...items.1.name`, ... In a code node rebuild
+  the list by scanning `vars` keys with that prefix (indices are numbers, sort them as numbers). After every chat
+  test run `call <call_id>`: it prints the variables at the end, so you see exactly which keys exist.
 - HTTP errors (4xx/5xx) still come back as a result with `status_code`; design a branch for each status the service
   documents (not found, not allowed, conflict, server error) and say something true to the caller.
 - Code (`code` node or `code_exec` tool, and pre/post hooks): Python with only `json`, `re`, `datetime`. Read and

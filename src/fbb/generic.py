@@ -40,6 +40,9 @@ Follow the Freya workflow reference below exactly (node types, fields, tools, tr
   body.properties with `default` values. Call variables (e.g. the customer number) are baked with "{{var}}"; fields the
   model fills have no default (or a default naming an unset variable) and a description. If the documents or test
   data say a service can answer slowly, set the call's config.timeoutMs above the longest documented delay.
+- The platform skips the entry actions of the initial node: start with a passthrough code node that only routes
+  (`always`) into the first api_request node. response_mapping maps leaf values only; a list arrives flattened as
+  `<tool>_response.data.<path>.0.<field>`, ... and is rebuilt in a code node from those `vars` keys.
 - Never ask the caller for something the call already gives as a variable. Use every call variable the documents list.
 - Every date decision uses the call variable for the current date/time, never the real clock. Where dates must be
   computed, compute them in a code node (`code_exec`, only json/re/datetime, never raise, never write two braces next to
