@@ -1,4 +1,5 @@
-"""Farklı `now` günlerinde pratik vakalar (docs/13 Faz 4): `fbb days <slot> --now 2026-10-16T11:00 [--brief A]`.
+"""Farklı `now` günlerinde pratik vakalar (docs/13 Faz 4): `fbb days <slot> --now 2026-10-16T11:00 [--brief A]`,
+ve kendi senaryolarımız (`fbb scenarios <slot> [--only X]`, tests/fixtures/scenarios.json).
 
 Kitin koşucusuyla aynı zincir: persona (kitin `persona_for`) → pratik oturum → simülasyon → ledger (`score_ledger`)
 + hakem. Değişen tek şey: çağrının `now` değişkeni ve o güne göre yeniden yazılmış senaryo/beklenti/checks
@@ -14,6 +15,7 @@ import time
 from fbb import config, kitapi
 
 DAYS_FILE = config.ROOT / "tests" / "fixtures" / "days.json"
+SCENARIOS_FILE = config.ROOT / "tests" / "fixtures" / "scenarios.json"
 PERSONAS = config.ROOT / ".personas-days.json"
 
 
@@ -37,12 +39,42 @@ def cases_for(now: str, brief: str = "", only: str = "") -> list[dict]:
     return out
 
 
+def scenarios_for(only: str = "", brief: str = "") -> list[dict]:
+    """Kendi senaryolarımız (`tests/fixtures/scenarios.json`): bir public vakanın hesabı (`base`) + kendi
+    script/expected/checks'imiz. Mock hesabı vaka ID'sine göre ürettiği için session `base` ile açılır."""
+    public = {c["id"]: c for c in json.loads((config.KIT / "public-test-set.json").read_text())}
+    out = []
+    for sid, sc in json.loads(SCENARIOS_FILE.read_text())["scenarios"].items():
+        if only and sid not in only.split(",") or brief and sc.get("brief", public[sc["base"]]["brief"]) != brief:
+            continue
+        c = copy.deepcopy(public[sc["base"]])
+        c.update({k: v for k, v in sc.items() if k in ("script", "expected", "checks", "title", "brief", "family")})
+        c["id"], c["base"] = sid, sc["base"]
+        if sc.get("now"):
+            c["variables"]["now"] = sc["now"]
+        out.append(c)
+    return out
+
+
 def run_days(agent_id: str, now: str, *, brief: str = "", only: str = "", style: str = "", reps: int = 1) -> dict:
+    return run_list(agent_id, cases_for(now, brief, only), f"days {now}", f"days-{agent_id[:8]}-{now[:10]}",
+                    style=style, reps=reps)
+
+
+def run_scenarios(agent_id: str, *, only: str = "", brief: str = "", style: str = "", reps: int = 1) -> dict:
+    return run_list(agent_id, scenarios_for(only, brief), "scenarios", f"scenarios-{agent_id[:8]}",
+                    style=style, reps=reps)
+
+
+def run_list(agent_id: str, cases: list[dict], label: str, out_prefix: str, *, style: str = "",
+             reps: int = 1) -> dict:
+    """Kit zinciri: persona → pratik oturum (vakanın `base`'i ya da kendi ID'si) → simülasyon → ledger + hakem."""
     kit = kitapi.freya()
     import run_cases  # kit/tools (kitapi.freya() yolu ekler)
     from score import http, score_ledger
 
-    cases = cases_for(now, brief, only)
+    if not cases:
+        raise SystemExit("koşulacak vaka yok")
     store = json.loads(PERSONAS.read_text()) if PERSONAS.exists() else {}
     spec = {c["id"]: run_cases.persona_for(c, {"identity": c["identity"]}, style or None) for c in cases}
     key = {i: i + ":" + hashlib.sha1(json.dumps(p, sort_keys=True).encode()).hexdigest()[:10] for i, p in spec.items()}
@@ -56,11 +88,11 @@ def run_days(agent_id: str, now: str, *, brief: str = "", only: str = "", style:
     for rep in range(reps):
         sessions = {}
         for c in cases:
-            v = http("/v1/practice/sessions", {"case": c["id"]})["variables"]
-            v["now"] = now
+            v = http("/v1/practice/sessions", {"case": c.get("base", c["id"])})["variables"]
+            v["now"] = c["variables"]["now"]
             sessions[c["id"]] = v
         t0 = time.time()
-        sim_id, it_id, status = kit.run_simulation(agent_id, f"days {now} {time.strftime('%H:%M:%S')}",
+        sim_id, it_id, status = kit.run_simulation(agent_id, f"{label} {time.strftime('%H:%M:%S')}",
                                                    {ids[c["id"]]: sessions[c["id"]] for c in cases})
         judge = {r["personaId"]: r for r in kit.get_iteration(sim_id, it_id)["runs"]}
         rows = []
@@ -74,12 +106,12 @@ def run_days(agent_id: str, now: str, *, brief: str = "", only: str = "", style:
                          "tools": [x["tool"] for x in led["calls"]], "slowest_turn_s": _slowest(kit, j.get("callId"))})
             tools = " > ".join(x["tool"].replace("verify_identity", "verify").replace("create_promise", "promise")
                                for x in led["calls"])
-            print(("PASS" if not r["failed"] else "FAIL"), c["id"], now[:10], "|", tools, flush=True)
+            print(("PASS" if not r["failed"] else "FAIL"), c["id"], c["variables"]["now"][:10], "|", tools, flush=True)
             for f in r["failed"]:
                 print("       -", f[:300], flush=True)
         waits = sorted(r["slowest_turn_s"] for r in rows if r["slowest_turn_s"] is not None)
         med = waits[len(waits) // 2] if waits else 0
-        print(f"-- {now} run {rep + 1}/{reps}: {sum(r['pass'] for r in rows)}/{len(rows)} passed, "
+        print(f"-- {label} run {rep + 1}/{reps}: {sum(r['pass'] for r in rows)}/{len(rows)} passed, "
               f"{time.time() - t0:.0f} s, slowest turn median {med:.0f} s, worst {waits[-1] if waits else 0:.0f} s, "
               f"simulation {sim_id} ({status})\n", flush=True)
         all_rows.append(rows)
@@ -88,12 +120,12 @@ def run_days(agent_id: str, now: str, *, brief: str = "", only: str = "", style:
     if reps > 1:
         for f in final:
             print(("PASS" if f["pass"] else "FAIL"), f["id"], f"{f['passes']}/{f['runs']}")
-    result = {"agent_id": agent_id, "now": now, "style": style, "runs": reps, "passed": sum(f["pass"] for f in final),
-              "total": len(final), "final": final, "all_rows": all_rows}
+    result = {"agent_id": agent_id, "label": label, "style": style, "runs": reps,
+              "passed": sum(f["pass"] for f in final), "total": len(final), "final": final, "all_rows": all_rows}
     config.RESULTS.mkdir(parents=True, exist_ok=True)
-    out = config.RESULTS / f"days-{agent_id[:8]}-{now[:10]}-{time.strftime('%m%d-%H%M%S')}.json"
+    out = config.RESULTS / f"{out_prefix}-{time.strftime('%m%d-%H%M%S')}.json"
     out.write_text(json.dumps(result, indent=1))
-    print(f"{result['passed']}/{result['total']} passed on {now}. sonuç dosyası: {out}")
+    print(f"{result['passed']}/{result['total']} passed ({label}). sonuç dosyası: {out}")
     return result
 
 
@@ -126,3 +158,10 @@ def main_args(sub) -> None:
     d.add_argument("--only", default="")
     d.add_argument("--style", default="")
     d.add_argument("--reps", type=int, default=1)
+    s = sub.add_parser("scenarios", help="kendi senaryolarımız: public vaka hesabı + kendi script/beklenti "
+                                         "(tests/fixtures/scenarios.json)")
+    s.add_argument("agent_id", help="agent ID ya da slot adı")
+    s.add_argument("--only", default="", help="senaryo ID'leri, virgülle")
+    s.add_argument("--brief", default="")
+    s.add_argument("--style", default="")
+    s.add_argument("--reps", type=int, default=1)

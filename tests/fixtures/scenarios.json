@@ -1,0 +1,139 @@
+{
+ "_doc": "Kendi canlı senaryolarımız (docs/13 Adım 3): `fbb scenarios <slot> [--only SC-01]`. Mock hesabı `base` vakasından gelir (aynı ürünler, aynı p1/p2/p3); script, expected ve checks bizim. `slot` hangi agent'ta koşulacağını söyler (spec dosyası). now = 2026-10-14 Çarşamba: bu Cuma 2026-10-16, yarın 2026-10-15.",
+ "scenarios": {
+  "SC-01": {
+   "base": "PUB-11",
+   "slot": "dev-b (tests/fixtures/spec_ab.json, batch)",
+   "title": "Agrees one product, then asks for a new plan (batch)",
+   "why": "Brief B kural 10: anlaşılmış ama kaydedilmemiş promise kaydedilmez; transferde not yazılmaz. Brief A kural 41.",
+   "script": "Gives the security answers correctly. Cannot pay everything today. For the credit card, agrees to pay the full amount this Friday. Then, before anything is read back or recorded, asks for a new payment plan with lower instalments for the personal loan, and insists on it.",
+   "expected": {
+    "outcome": "transferred",
+    "reason": "restructuring",
+    "promises": [],
+    "notes": [],
+    "callbacks": [],
+    "transfers": [
+     {
+      "queue": "restructuring"
+     }
+    ]
+   },
+   "checks": [
+    "transfer_to_agent called with queue restructuring",
+    "no promise recorded and add_note never called",
+    "the agent does not describe a payment plan of its own"
+   ]
+  },
+  "SC-02": {
+   "base": "PUB-11",
+   "slot": "var-pp (tests/fixtures/variants/spec_pp.json, per_product)",
+   "title": "Records one product, then asks for a new plan (per product)",
+   "why": "per_product: kabul edilen ürün hemen okunur ve kaydedilir; kural 10: kaydedilmiş promise kalır, transferde not yok; transfer kaydedilmiş promise'ten sonra gelirse outcome transferred.",
+   "script": "Gives the security answers correctly. Cannot pay everything today. For the credit card, agrees to pay the full amount this Friday and confirms when the agent reads it back. Then, for the personal loan, asks for a new payment plan with lower instalments, and insists on it.",
+   "expected": {
+    "outcome": "transferred",
+    "reason": "restructuring",
+    "promises": [
+     {
+      "product_id": "p1",
+      "amount": 220.0,
+      "date": "2026-10-16"
+     }
+    ],
+    "notes": [],
+    "callbacks": [],
+    "transfers": [
+     {
+      "queue": "restructuring"
+     }
+    ]
+   },
+   "checks": [
+    "the credit card promise is read back, confirmed and recorded before the next product is discussed",
+    "transfer_to_agent called with queue restructuring",
+    "add_note never called"
+   ]
+  },
+  "SC-03": {
+   "base": "PUB-12",
+   "slot": "var-pp (tests/fixtures/variants/spec_pp.json, per_product)",
+   "title": "Per product: one promise, one refusal, one dispute",
+   "why": "per_product + check_offer_answer + dispute: p1 hemen kaydedilir; p2 (geç bant) en çok 2 deneme sonra refused notu; p3 dispute notu; outcome promise (B outcome kuralı).",
+   "script": "Gives the security answers correctly. Will pay the credit card in full tomorrow and confirms at the read-back. Flatly refuses to pay the personal loan, whatever is offered. Says the car loan is not his: he never had a car loan.",
+   "expected": {
+    "outcome": "promise",
+    "reason": null,
+    "promises": [
+     {
+      "product_id": "p1",
+      "amount": 510.0,
+      "date": "2026-10-15"
+     }
+    ],
+    "notes": [
+     {
+      "product_id": "p2",
+      "reason": "refused"
+     },
+     {
+      "product_id": "p3",
+      "reason": "dispute"
+     }
+    ],
+    "callbacks": [],
+    "transfers": []
+   },
+   "checks": [
+    "the credit card promise is read back and confirmed before the next product is discussed",
+    "for the personal loan no offer is repeated after it was refused",
+    "the agent does not argue about the car loan and takes no promise for it"
+   ]
+  },
+  "SC-04": {
+   "base": "PUB-01",
+   "slot": "var-cc (tests/fixtures/variants/spec_cc.json, customer_callback post_verify)",
+   "title": "Verified customer asks to be called back tomorrow",
+   "why": "customer_callback: pencere third_party ile aynı (bugün ya da sonraki iş günü, 10:00-19:00); yarın 15:00 geçerli. Outcome spec'ten: no_promise/hardship. Kit mock'u no_promise için sadece refused/hardship/dispute/service_error kabul ediyor; 'hardship' burada sadece varsayılan kapanıştan (refused) ayırt etmek için bir işaret.",
+   "script": "Confirms he is Daniel Reyes and answers the security questions correctly. As soon as the agent starts talking about the account, says he is driving and cannot talk now, and asks to be called back tomorrow at three in the afternoon.",
+   "expected": {
+    "outcome": "no_promise",
+    "reason": "hardship",
+    "promises": [],
+    "notes": [],
+    "callbacks": [
+     {
+      "date": "2026-10-15",
+      "time": "15:00"
+     }
+    ],
+    "transfers": []
+   },
+   "checks": [
+    "callback scheduled for 15 October at 15:00",
+    "no persuasion attempt after the customer asked to be called back",
+    "no promise recorded"
+   ]
+  },
+  "SC-05": {
+   "base": "PUB-01",
+   "slot": "var-cc (tests/fixtures/variants/spec_cc.json, customer_callback post_verify)",
+   "title": "Verified customer only offers callback times outside the window",
+   "why": "customer_callback penceresi dışında iki kez: callback kurulmaz. Spec'te müşteri için ayrı 'no_callback' outcome'u yok; kapanış varsayılanı (hangup_verified = no_promise/refused) beklenir. Keşif senaryosu: boşluk varsa burada görünür.",
+   "script": "Confirms he is Daniel Reyes and answers the security questions correctly. As soon as the agent starts talking about the account, says he cannot talk now and asks to be called back next Monday at eight in the evening. If asked for another time, says Saturday morning. Will not discuss the payment now.",
+   "expected": {
+    "outcome": "no_promise",
+    "reason": "refused",
+    "promises": [],
+    "notes": [],
+    "callbacks": [],
+    "transfers": []
+   },
+   "checks": [
+    "no callback is scheduled outside 10:00-19:00 or later than the next business day",
+    "the agent asks once for another time",
+    "no promise recorded"
+   ]
+  }
+ }
+}
