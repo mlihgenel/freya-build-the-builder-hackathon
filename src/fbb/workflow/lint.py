@@ -136,7 +136,7 @@ def lint(workflow: dict, cat: ToolCatalog, *, call_vars: list[str], forbidden_pr
             if re.search(r"\b" + re.escape(w.lower()) + r"\b", system):
                 warns.append(f"system prompt doğrulama öncesi yasaklı kelime içeriyor: {w} (agent_role?)")
         if re.search(r"\brecorded\b", spoken):
-            warns.append(f"{name}: açılışta 'recorded' kelimesi var (hakem bunu promise kaydı sanabilir)")
+            warns.append(f"{name}: açılışta 'recorded' kelimesi var: brief cümleyi birebir veriyorsa doğru, vermiyorsa hakem promise kaydı sanabilir")
 
     # bankaya giden alanlar openapi'de var mı
     for name, n in list(nodes.items()) + [("tools", {"pre_actions": workflow.get("tools", [])})]:

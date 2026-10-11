@@ -75,9 +75,10 @@ How the program uses the spec:
   "batch" (all promises read back together, one confirmation, then recorded).
 - `locale`: if the brief's language is not English, translate every sentence and the weekday/month names into it,
   keeping the {placeholders}.
-- The opening must say that the call is recorded if the brief asks for it, but say it as "we record this call" (or the
-  equivalent in the brief's language), not with the word "recorded": a listener must never confuse it with a payment
-  promise being recorded. Do the same in `agent_role`.
+- If the brief gives the opening sentence word for word (quoted, or "say exactly"), copy it exactly, even when it
+  contains the word "recorded". Only when the brief merely says to mention that the call is recorded, write it as
+  "we record this call" (or the equivalent in the brief's language), not with the word "recorded": a listener must
+  never confuse it with a payment promise being recorded. In `agent_role` never use the word "recorded".
 - If the brief comes as raw material (mails, policy extracts, memos, code lists): later documents and memos change
   earlier ones; apply the change. If a change only applies from (or until) a date, keep the version that applies
   before it in the main fields and add an entry to `overrides` with `effective_from`/`effective_until` and only the
