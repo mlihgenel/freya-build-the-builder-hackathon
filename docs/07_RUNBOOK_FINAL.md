@@ -26,7 +26,9 @@
    - `make test lint secrets-check freeze-check` yeşil olmalı.
    - `env.sh` yüklü olmalı.
    - Claude girişi `claude` CLI ile kontrol edilmeli.
-   - Workspace'te çalışan bir simülasyon olmamalı.
+   - Workspace'te çalışan bir simülasyon olmamalı: `GET /api/v2/simulations?limit=5`; `running` kalmış varsa
+     `POST /api/v2/simulations/<id>/cancel` (02, 11 Eki).
+   - Platform sağlık kontrolü: kimlikli bir GET birkaç saniyede dönmeli (11 Eki'de dakikalarca 504 verdi).
 2. **20:00** Brief'ler açılır. Dosyalar `final/<ad>/` altına indirilir; brief ve openapi'nin içine hiçbir şey yazılmaz.
 3. **20:05** Önce temiz spesifikasyon olan brief:
    ```bash
@@ -63,4 +65,6 @@
 | Lint hatası (beklenmeyen tablo ya da alan) | Hata genel bir bug ise düzelt ve kaydet. Spec alanı eksikse prompt'u genel olarak düzelt |
 | Freya 5xx ya da `1010` | Tekrar dene. `User-Agent`'ı `freya.py` ayarlıyor |
 | Mock'a erişilemiyor (timeout, DNS) | VPN aç; olmazsa DNS 1.1.1.1; olmazsa telefondan hotspot. Kontrol: `curl -s -o /dev/null -w '%{http_code}' https://freya-bank-mock.freyavoice.workers.dev/v1/practice/sessions` (401 = erişim var) |
+| Deploy sırasında Freya 5xx / zaman aşımı (11 Eki'de sık) | Çıkarım tekrarlanmaz: build spec'i deploy'dan önce yazar. `uv run build-agent final/<x>/brief.md --tools final/<x>/openapi.json --spec out/final-<x>.spec.json --slot final-<x>` (saniyeler, LLM yok). Teslimde iki trace birlikte verilir: çıkarımlı olan + deploy eden. BUGFIX_LOG'a "platform kesintisi, kod değişmedi" yazılır |
+| Simülasyon / chat 504 veriyor, takılıyor | Simülasyon çökmüş olmayabilir (02). `fbb` koşucusu GET'leri ~5 dk tekrar dener, 10 dk'yı aşan simülasyonu iptal eder. Hiçbir müşteride tool çağrısı yoksa ya da "no verdict" geliyorsa bu kesintidir: ajan **düzeltilmez**, beklenir |
 | Platform workflow'un bir kısmını sildiyse | Trace'teki `freya_readback` farkına bak, `02`'yi güncelle |

@@ -38,7 +38,7 @@ uv run fbb chat brief-a "Hello?" --case PUB-01                                  
 | `src/fbb/build.py`, `cli.py`, `trace.py`, `kitapi.py` | 03, 09 |
 | `tests/` | 06 |
 
-## Durum (11 Ekim 2026, ~10:30 TR; ayrıntı ve sıradaki adımlar `13_FINAL_HAZIRLIK.md`)
+## Durum (11 Ekim 2026, ~14:45 TR; ayrıntı ve sıradaki adımlar `13_FINAL_HAZIRLIK.md`)
 - `11_REVIEW.md`'deki düzeltmeler uygulandı (madde madde durum: `11_REVIEW.md` §F). Özet:
   - close_call: kapanış node'larında + müşteri kapatırsa lifecycle yedeği; erken outcome yazımı; retries 2.
   - Read-back/onay kodda (`propose_results` → `readback`); geçersiz teklif tts ile söylenir.
@@ -55,3 +55,4 @@ uv run fbb chat brief-a "Hello?" --case PUB-01                                  
 - **11 Eki ~01:45, finale hazırlık Faz 1 ✅** (`13_FINAL_HAZIRLIK.md`): Claude'un çıkardığı spec'le (finaldeki zincir) A **10/10** ve B **3/3** pass³. Üç ayrı çıkarımda puan alanlarında fark yok (`fbb specdiff`). Build: A 87 sn / $0.63, A+B 100 sn / $0.91.
 - Sonuç tablosu ve test komutları: `10_TEST_REHBERI.md` §9.
 - **11 Eki ~05:00 (Mert):** Faz 4 (3 farklı gün, `fbb days`) 38/39; Faz 2 (5 stil) düzeltmelerle talkative A 10/10, B 3/3; hardship ve `per_product` + `next_offer` düzeldi. Son sürüm: A **10/10** ve B **3/3** pass³. Ayrıntı `13_FINAL_HAZIRLIK.md`, `10_TEST_REHBERI.md` §9.
+- **11 Eki 10:30–14:45:** teslim provası (temiz klon, 109 sn), `fbb scenarios` (SC-01..05 pass³), canlıda bulunan hatalar (aynı turda iki tool, callback, hakemin tool adlarını yanlış okuması) düzeltildi; 4 stil son kodla A 39/40 · B 12/12; Brief D/E + C ikili çıkarımları 0 PUAN farkı; Freya kesintilerine karşı GET tekrarı + simülasyon bekçisi. 13:00'ten sonra Freya API kesintisi: son değişikliklerin A/B `--reps 3` regresyonu bekliyor.
