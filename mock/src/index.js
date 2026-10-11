@@ -1,164 +1,109 @@
-// Freya Bank mock (final): yedi tool + kayıt defteri. Müşteri başına durum bir Durable Object'te (tutarlı, kalıcı).
-// Davranış kitin mock'unda gözlenene göre (docs/02); sözleşmeye özgü değerler config.js ve customers.json'da.
-import { CONFIG } from "./config.js";
-import CUSTOMERS from "../customers.json";
+// Bankanın servislerinin mock'u (final). Test müşterileri için test-environment/test-customers.json'daki cevabı
+// (HTTP kodu dahil, varsa gecikmesiyle) aynen döndürür. Durumsuz: cevaplar sabit veriden gelir.
+//
+// Servis yoldan tanınır (entegrasyon belgesinin yolu ya da servis adı, ör. /cards/list, /cards.list); parametreler
+// (müşteri numarası, kart numarası, istenen hafta) gövdede, sorgu parametresinde ya da başlıkta aranır.
+import DATA from "../data/test-customers.json";
 
-const TOOLS = ["verify_identity", "get_account", "create_promise", "add_note", "schedule_callback",
-  "transfer_to_agent", "close_call"];
-const json = (body, status = 200) => new Response(JSON.stringify(body), {
-  status, headers: { "content-type": "application/json", "access-control-allow-origin": "*" } });
+const CUSTOMERS = Object.fromEntries(DATA.customers.map((c) => [String(c.customerNo), c]));
 
-export default {
-  async fetch(req, env) {
-    const url = new URL(req.url);
-    const path = url.pathname.replace(/\/+$/, "");
-    const base = CONFIG.basePath;
-    if (req.method === "GET" && (path === "" || path === base)) return json({ ok: true, service: "bank-mock" });
-    // kayıt defteri: GET <base>/ledger/<customer_id>  (ve kitteki gibi <base>/practice/ledger/<id>)
-    const m = path.match(new RegExp(`^${base}(?:/practice)?/ledger/([^/]+)$`));
-    if (req.method === "GET" && m) return stub(env, m[1]).fetch(new Request("https://do/ledger"));
-    // pratik oturumu: POST <base>/practice/sessions {case} → test müşterisinin yeni bir kopyası
-    if (req.method === "POST" && path === `${base}/practice/sessions`) {
-      const body = await req.json().catch(() => ({}));
-      const c = CUSTOMERS[body.case || body.customer || ""];
-      if (!c) return json({ ok: false, error: "unknown case" }, 404);
-      const id = `${body.case}-${crypto.randomUUID().slice(0, 8)}`;
-      await stub(env, id).fetch(new Request("https://do/init", { method: "POST", body: JSON.stringify(c) }));
-      return json({ ok: true, variables: { ...(c.variables || {}), customer_id: id } });
-    }
-    const tool = TOOLS.find((t) => path === `${base}/${t}`);
-    if (!tool || req.method !== "POST") return json({ ok: false, error: "not found" }, 404);
-    const body = await req.json().catch(() => null);
-    if (!body) return json({ ok: false, error: "body must be JSON" }, 400);
-    const cid = String(body[CONFIG.fields.customer] || "");
-    if (!cid) return json({ ok: false, error: "customer_id is required" }, 400);
-    return stub(env, cid).fetch(new Request(`https://do/${tool}`, { method: "POST", body: JSON.stringify(body) }));
-  },
+// servis adı → yolda aranacak kelime grupları (hepsi geçmeli); ilk eşleşen kazanır, özel olanlar önce
+const ROUTES = [
+  ["statement.week.decide", [["week", "decide"]]],
+  ["statement.week.change", [["week", "change"], ["week", "update"]]],
+  ["statement.week.get", [["week"]]],
+  ["statement.pdf.send", [["pdf"], ["statement", "send"], ["statement", "mail"]]],
+  ["contact.email.get", [["email"], ["mail"], ["contact"]]],
+  ["cards.balance", [["balance"], ["debt"]]],
+  ["cards.list", [["card"]]],
+];
+
+const PARAMS = {
+  customer: ["customerno", "customernumber", "customer_no", "customerid", "custno", "customer"],
+  card: ["cardnumber", "cardno", "card_number", "maskedcardnumber", "card", "pan"],
+  week: ["newstatementweek", "statementweek", "week", "newweek"],
 };
 
-function stub(env, cid) { return env.LEDGER.get(env.LEDGER.idFromName(cid)); }
+const headers = { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*",
+  "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,PUT,PATCH,OPTIONS" };
+const reply = (body, status) => new Response(JSON.stringify(body), { status, headers });
 
-export class Ledger {
-  constructor(state) { this.state = state; }
-
-  async load(cid) {
-    let s = await this.state.storage.get("s");
-    if (!s) {
-      // doğrudan test müşterisi kimliğiyle gelen çağrı (organizatörün müşterileri): kaydı ilk çağrıda kur
-      const c = CUSTOMERS[cid] || Object.values(CUSTOMERS).find((x) => x.customer_id === cid);
-      if (!c) return null;
-      s = fresh(c);
-    }
-    return s;
+function service(pathname) {
+  const p = decodeURIComponent(pathname).toLowerCase();
+  for (const [name, groups] of ROUTES) {
+    if (p.includes(name)) return name;
   }
+  for (const [name, groups] of ROUTES) {
+    if (groups.some((g) => g.every((w) => p.includes(w)))) return name;
+  }
+  return null;
+}
 
+function collect(obj, out) {
+  if (!obj || typeof obj !== "object") return;
+  for (const [k, v] of Object.entries(obj)) {
+    if (v && typeof v === "object") collect(v, out);
+    else if (v !== null && v !== undefined && v !== "") out[k.toLowerCase().replace(/[^a-z0-9_]/g, "")] ??= String(v);
+  }
+}
+
+function pick(vals, names) {
+  for (const n of names) if (vals[n] !== undefined) return vals[n];
+  return undefined;
+}
+
+function digits(x) { return String(x || "").replace(/\D/g, ""); }
+
+function byCard(table, card) {
+  if (!table || card === undefined) return undefined;
+  if (table[card]) return table[card];
+  const want = digits(card);
+  for (const key of Object.keys(table)) {
+    const k = digits(key);
+    // maskeli numaralar: baştaki ve sondaki rakamlar tutmalı (ör. 540000******1234 ↔ 5400********1234 ↔ 1234)
+    if (want && (k === want || (want.length <= 6 && k.endsWith(want)) ||
+        (k.slice(-4) === want.slice(-4) && (want.length <= 4 || k.slice(0, 4) === want.slice(0, 4))))) return table[key];
+  }
+  return undefined;
+}
+
+function error(code, text, status) {
+  return reply({ result: { returnCode: code, messageText: text, code, message: text, type: "ERROR" } }, status);
+}
+
+export default {
   async fetch(req) {
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const url = new URL(req.url);
-    const op = url.pathname.slice(1);
-    if (op === "init") {
-      await this.state.storage.put("s", fresh(await req.json()));
-      return json({ ok: true });
+    if (url.pathname === "/" || url.pathname === "/health") return reply({ ok: true, customers: DATA.customers.length }, 200);
+    const svc = service(url.pathname);
+    if (!svc) return error("NOT_FOUND", `unknown service path ${url.pathname}`, 404);
+    const vals = {};
+    collect(Object.fromEntries(url.searchParams), vals);
+    if (!["GET", "HEAD"].includes(req.method)) {
+      const text = await req.text();
+      try { collect(JSON.parse(text || "{}"), vals); } catch { /* gövde JSON değilse yok sayılır */ }
     }
-    if (op === "ledger") {
-      const s = await this.state.storage.get("s");
-      if (!s) return json({ ok: false, error: "unknown customer_id" }, 404);
-      const { outcome, reason, promises, notes, callbacks, transfers, calls } = s;
-      return json({ outcome, reason, promises, notes, callbacks, transfers, calls });
+    for (const [k, v] of req.headers) vals[k.toLowerCase().replace(/[^a-z0-9_]/g, "")] ??= v;
+    // yolda numara olabilir: /customers/90000001/cards
+    const pathNums = url.pathname.split("/").filter((s) => /^\d{6,}$/.test(s));
+    const customerNo = pick(vals, PARAMS.customer) ?? pathNums[0];
+    const c = CUSTOMERS[digits(customerNo)] || CUSTOMERS[String(customerNo)];
+    if (!c) return error("FB_IVR_CHANNEL_101", "Müşteri bulunamadı.", 404);
+    let entry = c.services[svc];
+    if (!entry) return error("FB_IVR_CHANNEL_100", "Servis bu müşteri için tanımlı değil.", 404);
+    if (!("http" in entry)) {  // kart numarasıyla anahtarlı
+      const card = pick(vals, PARAMS.card) ?? pathNums.find((n) => n !== digits(customerNo));
+      entry = byCard(entry, card);
+      if (!entry) return error("FB_IVR_CHANNEL_103", "Kart bulunamadı.", 404);
+      if (!("http" in entry)) {  // hafta ile anahtarlı (statement.week.decide / change)
+        const week = pick(vals, PARAMS.week);
+        entry = entry[String(parseInt(week, 10))] ?? entry[String(week)];
+        if (!entry) return error("FB_IVR_CHANNEL_104", "Geçersiz hafta.", 400);
+      }
     }
-    const body = await req.json();
-    const cid = String(body[CONFIG.fields.customer]);
-    const s = await this.load(cid);
-    if (!s) return json({ ok: false, error: "unknown customer_id" }, 404);
-    const [result, status] = handle(op, body, s);
-    s.calls.push({ tool: op, args: body, result, at: new Date().toISOString() });
-    await this.state.storage.put("s", s);
-    return json(result, status);
-  }
-}
-
-function fresh(c) {
-  return { customer: c, verified: {}, wrong: 0, faults: { ...(c.faults || {}) }, outcome: null, reason: null,
-    closed: false, promises: [], notes: [], callbacks: [], transfers: [], calls: [] };
-}
-
-function allVerified(s) {
-  return Object.keys(s.customer.identity || {}).every((f) => s.verified[f]);
-}
-
-function isDate(v) { return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v)); }
-
-function fault(s, op) {
-  // customers.json: "faults": {"create_promise": 1} → ilk N çağrı 500 döner, hiçbir şey kaydedilmez
-  if (s.faults[op] > 0) { s.faults[op] -= 1; return true; }
-  return false;
-}
-
-function handle(op, b, s) {
-  const F = CONFIG.fields;
-  if (fault(s, op)) return [{ ok: false, error: "service unavailable" }, 500];
-  if (op === "verify_identity") {
-    const field = String(b[F.field] || ""), answer = String(b[F.answer] ?? "").trim();
-    const ids = s.customer.identity || {};
-    if (!(field in ids)) return [{ ok: false, error: `unknown field; use one of ${Object.keys(ids).join(", ")}` }, 200];
-    if (s.wrong >= CONFIG.maxWrong) return [{ ok: true, verified: false, wrong_answers_left: 0, all_verified: false }, 200];
-    if (CONFIG.dateFields.includes(field) && !isDate(answer))
-      return [{ ok: false, error: "answer is not a date. Send it as YYYY-MM-DD." }, 200];
-    const want = String(ids[field]);
-    const norm = (x) => x.replace(/\s+/g, "").toUpperCase();
-    if (norm(answer) === norm(want)) {
-      s.verified[field] = true;
-      return [{ ok: true, verified: true, wrong_answers_left: CONFIG.maxWrong - s.wrong, all_verified: allVerified(s) }, 200];
-    }
-    if (CONFIG.swapHint && CONFIG.dateFields.includes(field)) {
-      const [y, m, d] = answer.split("-");
-      if (`${y}-${d}-${m}` === want) return [{ ok: true, verified: false, wrong_answers_left: CONFIG.maxWrong - s.wrong,
-        all_verified: false, hint: CONFIG.swapHint }, 200];
-    }
-    s.wrong += 1;
-    return [{ ok: true, verified: false, wrong_answers_left: CONFIG.maxWrong - s.wrong, all_verified: false }, 200];
-  }
-  if (s.closed && op !== "close_call") return [{ ok: false, error: "the call is already closed" }, 200];
-  if (op === "get_account") {
-    if (!allVerified(s)) return [{ ok: false, error: "identity not verified" }, 200];
-    return [{ ok: true, products: (s.customer.products || []).map((p, i) => ({ product_id: `p${i + 1}`, ...p })) }, 200];
-  }
-  const pids = (s.customer.products || []).map((_, i) => `p${i + 1}`);
-  if (op === "create_promise") {
-    if (!allVerified(s)) return [{ ok: false, error: "identity not verified" }, 200];
-    const pid = String(b[F.product]), amount = Number(b[F.amount]), date = String(b[F.date] || "");
-    if (!pids.includes(pid)) return [{ ok: false, error: "unknown product_id" }, 200];
-    if (!(amount > 0) || !isDate(date)) return [{ ok: false, error: "amount must be a number and date YYYY-MM-DD" }, 200];
-    if (s.promises.some((p) => p.product_id === pid)) return [{ ok: false, error: "one promise per product" }, 200];
-    s.promises.push({ product_id: pid, amount, date });
-    return [{ ok: true, promise_id: `pr${s.promises.length}` }, 200];
-  }
-  if (op === "add_note") {
-    const pid = String(b[F.product] || ""), reason = String(b[F.reason] || "");
-    if (!CONFIG.noteReasons.includes(reason)) return [{ ok: false, error: `reason must be one of ${CONFIG.noteReasons.join(", ")}` }, 200];
-    s.notes.push({ product_id: pid, reason, text: b.text || "" });
-    return [{ ok: true }, 200];
-  }
-  if (op === "schedule_callback") {
-    const date = String(b[F.date] || ""), time = String(b[F.time] || "");
-    if (!isDate(date) || !/^\d{2}:\d{2}$/.test(time)) return [{ ok: false, error: "date YYYY-MM-DD and time HH:MM" }, 200];
-    s.callbacks.push({ date, time });
-    return [{ ok: true }, 200];
-  }
-  if (op === "transfer_to_agent") {
-    const queue = String(b[F.queue] || "");
-    if (!CONFIG.queues.includes(queue)) return [{ ok: false, error: `queue must be one of ${CONFIG.queues.join(", ")}` }, 200];
-    s.transfers.push({ queue });
-    return [{ ok: true }, 200];
-  }
-  if (op === "close_call") {
-    if (s.closed) return [{ ok: false, error: "the call is already closed" }, 200];
-    const outcome = String(b[F.outcome] || ""), reason = b[F.reason] == null ? null : String(b[F.reason]);
-    const allowed = CONFIG.outcomes[outcome];
-    if (!allowed) return [{ ok: false, error: `outcome must be one of ${Object.keys(CONFIG.outcomes).join(", ")}` }, 200];
-    if (allowed.length && !allowed.includes(reason)) return [{ ok: false, error: `this outcome needs one of these reasons: ${allowed.join(", ")}` }, 200];
-    if (!allowed.length && reason) return [{ ok: false, error: "this outcome takes no reason" }, 200];
-    s.closed = true; s.outcome = outcome; s.reason = allowed.length ? reason : null;
-    return [{ ok: true }, 200];
-  }
-  return [{ ok: false, error: "not found" }, 404];
-}
+    const delay = Number(entry.gecikmeSaniye || entry.delaySeconds || 0);
+    if (delay > 0) await new Promise((r) => setTimeout(r, delay * 1000));
+    return reply(entry.response ?? entry.yanit ?? {}, Number(entry.http) || 200);
+  },
+};
