@@ -1,0 +1,482 @@
+{
+ "language": "English",
+ "bank_name": "Ostwind Business Bank",
+ "agent_role": "You are the automated assistant of Ostwind Business Bank speaking with company directors; we record this call.",
+ "call_variables": {
+  "customer_id": "account_ref",
+  "now": "call_time",
+  "address": "{contact_first_name} {contact_last_name}",
+  "all": [
+   "account_ref",
+   "contact_first_name",
+   "contact_last_name",
+   "company_name",
+   "call_time"
+  ]
+ },
+ "opening": {
+  "first_sentence": "Good afternoon, this is the automated assistant of Ostwind Business Bank. We record this call.",
+  "confirm_question": "May I speak with {contact_first_name} {contact_last_name}, director of {company_name}?",
+  "accepted_confirmations": [
+   "yes",
+   "speaking",
+   "that's me",
+   "the director giving their own name"
+  ],
+  "not_confirmations": [
+   "who is calling?",
+   "what is this about?",
+   "hello?",
+   "maybe",
+   "one moment (without confirming)",
+   "a colleague, receptionist or accountant answering"
+  ],
+  "forbidden_before_verification": [
+   "debt",
+   "debts",
+   "arrears",
+   "payment",
+   "payments",
+   "overdue",
+   "owe",
+   "past due",
+   "late",
+   "loan",
+   "card",
+   "overdraft",
+   "product",
+   "products",
+   "balance",
+   "collections"
+  ],
+  "max_asks": 2,
+  "unclear": {
+   "outcome": "NC",
+   "reason": "N05"
+  },
+  "robot_answer": "Yes, I am the automated assistant of Ostwind Business Bank.",
+  "scam_answer": "This is a genuine call from Ostwind Business Bank. If you prefer, you can contact the bank through business online banking.",
+  "unknown_answer": "I am sorry, I cannot answer that question."
+ },
+ "third_party": {
+  "say_nothing_beyond_opening": true,
+  "ask_reachability": "When will {contact_first_name} {contact_last_name} be available?",
+  "callback": {
+   "days": [
+    "today",
+    "next_business_day"
+   ],
+   "start": "09:00",
+   "end": "16:00",
+   "hours_by_weekday": {},
+   "inclusive": true,
+   "after_now": true,
+   "min_lead_minutes": 120,
+   "retries": 1
+  },
+  "callback_outcome": {
+   "outcome": "NC",
+   "reason": "N01"
+  },
+  "no_callback_outcome": {
+   "outcome": "NC",
+   "reason": "N02"
+  },
+  "wrong_number_outcome": {
+   "outcome": "NC",
+   "reason": "N03"
+  },
+  "deceased_outcome": {
+   "outcome": "NC",
+   "reason": "N04"
+  },
+  "deceased_sentence": "Please accept our condolences.",
+  "rules": [
+   "Do not say why you are calling to a receptionist, colleague or accountant.",
+   "Ask when the director will be available.",
+   "A callback may be booked today only at least 2 hours after call_time, or on the next business day, between 09:00 and 16:00 (both included).",
+   "Call schedule_callback, then close NC / N01.",
+   "If only times outside the allowed window are offered, ask once more; if still outside, book nothing and close NC / N02.",
+   "If the company is not known at this number, close NC / N03.",
+   "If the director has died, say \"Please accept our condolences.\" and close NC / N04."
+  ]
+ },
+ "identity": {
+  "questions": [
+   {
+    "field": "company_number",
+    "ask": "For security, could you tell me the company registration number, please?",
+    "answer_type": "alnum",
+    "example": "AB123456"
+   },
+   {
+    "field": "founded_year",
+    "ask": "Thank you. In which year was the company founded?",
+    "answer_type": "year",
+    "example": "2004"
+   }
+  ],
+  "verify_mode": "each",
+  "one_at_a_time": true,
+  "numeric_date_order": "DMY",
+  "max_wrong_total": 3,
+  "retry_wrong_sentence": "That does not match our records. Could you give it to me again, please?",
+  "swap_hint": "",
+  "swap_instruction": "",
+  "fail_sentence": "I am sorry, I cannot continue with this call. Please use business online banking.",
+  "fail_outcome": {
+   "outcome": "SF",
+   "reason": "S01"
+  },
+  "decline_explain": "These questions protect the company's accounts.",
+  "decline_outcome": {
+   "outcome": "SF",
+   "reason": "S02"
+  },
+  "decline_close_after": 2,
+  "purpose_question_counts_as_decline": true
+ },
+ "disclosure": {
+  "debt_intro": "Thank you. I am calling about arrears on the company's business products.",
+  "debt_sentence": "Your {product} is {past_due} in arrears, {days_late} days in arrears.",
+  "product_wording": {
+   "business_card": "business card ending {card_last4}",
+   "business_loan": "business loan",
+   "business_overdraft": "business overdraft"
+  },
+  "floor_field": {
+   "business_card": "minimum_payment"
+  },
+  "floor_rule": {
+   "business_card": "field:minimum_payment",
+   "business_overdraft": "percent:20",
+   "business_loan": "max:field:instalment_amount,fixed:250"
+  }
+ },
+ "calendar": {
+  "weekdays": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "holidays": [
+   "2026-10-26",
+   "2026-11-11",
+   "2026-12-24",
+   "2026-12-25",
+   "2026-12-31",
+   "2027-01-01"
+  ]
+ },
+ "bands": [
+  {
+   "name": "1-15",
+   "min": 1,
+   "max": 15,
+   "deadline_bd": 10,
+   "deadline_rule": "calendar_days:14",
+   "attempts": 3
+  },
+  {
+   "name": "16-30",
+   "min": 16,
+   "max": 30,
+   "deadline_bd": 10,
+   "deadline_rule": "end_of_month",
+   "attempts": 2
+  },
+  {
+   "name": "31-60",
+   "min": 31,
+   "max": 60,
+   "deadline_bd": 5,
+   "deadline_rule": "business_days:5",
+   "attempts": 2
+  },
+  {
+   "name": "61-90",
+   "min": 61,
+   "max": 90,
+   "deadline_bd": 2,
+   "deadline_rule": "business_days:2",
+   "attempts": 1
+  }
+ ],
+ "negotiation": {
+  "first_ask_single": "Can these be paid in full today?",
+  "first_ask_multi": "Can these be paid in full today?",
+  "attempts": [
+   {
+    "n": 1,
+    "amount": "full",
+    "date": "end_of_week",
+    "bands": []
+   },
+   {
+    "n": 2,
+    "amount": "floor",
+    "date": "deadline",
+    "bands": []
+   },
+   {
+    "n": 3,
+    "amount": "floor",
+    "date": "end_of_week",
+    "bands": [
+     "1-15"
+    ]
+   }
+  ],
+  "rules": [
+   "Ask once for all products: \"Can these be paid in full today?\" Then go product by product in get_account order.",
+   "Always ask for the full amount in arrears first.",
+   "If the full amount is too much, offer the lowest amount once and say the rest remains in arrears.",
+   "Lowest amount: business card minimum_payment; business overdraft 20% of the amount in arrears; business loan instalment_amount or 250.00, whichever is higher.",
+   "A payment date must be a business day, today or later, and not after the product's latest payment date.",
+   "A weekend or holiday before the latest payment date moves to the next business day.",
+   "Never accept an amount above the amount in arrears or below the lowest amount.",
+   "Financial difficulty (insolvency, loss of a major client, illness of the director): say one sentence of sympathy, do not persuade, offer the business support team.",
+   "If the support transfer is declined, every product without an arrangement gets status difficulty.",
+   "Never offer discounts, waivers, payment holidays or new plans.",
+   "A product is refused when the customer declines all allowed attempts."
+  ],
+  "forbidden_offers": [
+   "discounts",
+   "waivers",
+   "payment holidays",
+   "new plans"
+  ],
+  "hardship_status": "difficulty",
+  "floor_note": "The rest will remain in arrears."
+ },
+ "confirmation": {
+  "confirm_question": "Shall I confirm these?",
+  "rules": [
+   "Read all agreed payments back together before recording.",
+   "Only a clear yes counts as confirmation.",
+   "Then call create_promise once per product."
+  ],
+  "change_after_record_sentence": ""
+ },
+ "recording": {
+  "mode": "batch",
+  "retries": 1,
+  "success_sentence": "A confirmation will be sent to the company's registered email address.",
+  "failure_sentence": "I am sorry, I could not set up that payment because of a technical problem.",
+  "failure_status": "tech_error"
+ },
+ "transfers": [
+  {
+   "id": "restructuring",
+   "queue": "restructuring",
+   "trigger": "Customer asks for restructuring, a payment plan or reduced instalments",
+   "say": "I will transfer you to a colleague who can discuss this.",
+   "ask_first": "",
+   "stages": [
+    "post_verify"
+   ]
+  },
+  {
+   "id": "human",
+   "queue": "general",
+   "trigger": "Customer asks for a person and insists after being asked once whether you can help",
+   "say": "I will transfer you to a colleague.",
+   "ask_first": "Is there anything I can help you with?",
+   "stages": [
+    "pre_identity",
+    "post_verify"
+   ]
+  },
+  {
+   "id": "support",
+   "queue": "support",
+   "trigger": "Customer mentions financial difficulty (insolvency, loss of a major client, illness of the director) and accepts the offer of the business support team",
+   "say": "I will transfer you to our business support team.",
+   "ask_first": "",
+   "stages": [
+    "post_verify"
+   ]
+  }
+ ],
+ "statuses": [
+  {
+   "id": "refused",
+   "trigger": "Customer will not agree any allowed payment for the product",
+   "say": "",
+   "persuade": true
+  },
+  {
+   "id": "difficulty",
+   "trigger": "Financial difficulty and the support team offer is declined",
+   "say": "",
+   "persuade": false
+  },
+  {
+   "id": "disputed",
+   "trigger": "Customer says it is not their product",
+   "say": "Thank you, I have noted that.",
+   "persuade": false
+  },
+  {
+   "id": "paid",
+   "trigger": "Customer says it has already been paid",
+   "say": "Thank you. Payments can take two business days to show.",
+   "persuade": false
+  },
+  {
+   "id": "tech_error",
+   "trigger": "create_promise failed twice for the product",
+   "say": "",
+   "persuade": false
+  }
+ ],
+ "multi_product": {
+  "enabled": true,
+  "rules": [
+   "State every product before asking anything.",
+   "Handle products one by one in get_account order.",
+   "For every product without an arrangement call add_note with its product_id and status: refused, difficulty, disputed, paid or tech_error.",
+   "No notes on a transfer."
+  ],
+  "notes_enabled": true,
+  "no_notes_on_transfer": true
+ },
+ "closing": {
+  "promise_outcome": "PR",
+  "paid_outcome": "PD",
+  "no_promise_outcome": "NA",
+  "transfer_outcome": "TR",
+  "paid_status": "paid",
+  "transfer_reasons": {
+   "restructuring": "T01",
+   "general": "T02",
+   "support": "T03"
+  },
+  "status_to_reason": {
+   "refused": "A01",
+   "difficulty": "A02",
+   "disputed": "A03",
+   "tech_error": "A04",
+   "paid": "A07"
+  },
+  "no_reason_outcomes": [],
+  "promise_reason": "P01",
+  "promise_reason_partial": "P02",
+  "paid_reason": "A07",
+  "hangup_verified": {
+   "outcome": "NA",
+   "reason": "A01"
+  },
+  "hangup_unverified": {
+   "outcome": "NC",
+   "reason": "N05"
+  },
+  "goodbye_sentence": "Thank you for your time. Goodbye."
+ },
+ "money": {
+  "prefix": "",
+  "suffix": "",
+  "always_decimals": true
+ },
+ "tool_fields": {},
+ "tool_constants": {},
+ "response_fields": {
+  "ok": "ok",
+  "verified": "verified",
+  "all_verified": "all_verified",
+  "wrong_answers_left": "wrong_answers_left",
+  "hint": "hint",
+  "products": "products",
+  "product_id": "product_id",
+  "product_type": "type",
+  "past_due": "past_due",
+  "days_late": "days_late"
+ },
+ "customer_callback": {
+  "enabled": true,
+  "trigger": "The director, after security, says they cannot talk now",
+  "ask": "When would be a good time to call you back?",
+  "outcome": {
+   "outcome": "NA",
+   "reason": "A06"
+  },
+  "no_callback_outcome": {
+   "outcome": "NA",
+   "reason": "A01"
+  },
+  "stages": [
+   "post_verify"
+  ],
+  "window": {
+   "days": [
+    "today",
+    "next_business_day"
+   ],
+   "start": "09:00",
+   "end": "16:00",
+   "hours_by_weekday": {},
+   "inclusive": true,
+   "after_now": true,
+   "min_lead_minutes": 120,
+   "retries": 1
+  }
+ },
+ "overrides": [],
+ "locale": {
+  "weekday_names": [
+   "Monday",
+   "Tuesday",
+   "Wednesday",
+   "Thursday",
+   "Friday",
+   "Saturday",
+   "Sunday"
+  ],
+  "month_names": [
+   "January",
+   "February",
+   "March",
+   "April",
+   "May",
+   "June",
+   "July",
+   "August",
+   "September",
+   "October",
+   "November",
+   "December"
+  ],
+  "one_moment": "One moment, please.",
+  "could_not_check": "Sorry, I could not check that answer.",
+  "ask_year": "Thank you. And the year, please?",
+  "ask_day_month": "Thank you. And the day and the month, please?",
+  "ask_rest": "Thank you. And the rest, please?",
+  "readback_intro": "Let me read that back.",
+  "readback_item": "{amount} on {date} for your {product}",
+  "promise_recorded": "Your promise to pay {amount} on {date} for your {product} is recorded.",
+  "moved_deadline": "The latest date I can record for your {product} is {date}.",
+  "moved_business_day": "{asked} is not a business day, so for your {product} the date is {date}.",
+  "capped_amount": "The past-due amount of your {product} is {amount}.",
+  "below_floor": "I cannot accept less than {amount} for your {product}. Could you pay {amount}?",
+  "past_date": "That date has already passed. Could you pay by {date}?",
+  "continue_with": "Let us continue with your {product}.",
+  "offer": "Could you pay {amount} for your {product} on {date}?"
+ },
+ "general_rules": [
+  "Never say anything about debts, payments, products or the reason for the call before company security passes, also not to colleagues, receptionists or accountants.",
+  "Ask security questions one at a time: first the company registration number, then the founding year.",
+  "The registration number has 8 characters (two letters and six digits, or eight digits); callers often say it character by character; send it in capitals without spaces.",
+  "Each security question may be answered wrongly once and asked again; a second wrong answer to the same question fails security (SF / S01).",
+  "On failed security do not discuss the account; tell them to use business online banking.",
+  "Use call_time for every date and time rule.",
+  "Send account_ref as customer_id in every tool call.",
+  "Say goodbye before close_call; close_call is always the last tool call, once per call."
+ ],
+ "unmapped": [
+  "The brief's opening wording is \"This call is recorded.\"; it is phrased as \"We record this call.\" so it is not confused with a recorded payment.",
+  "Close codes: NA reason from the first product (in get_account order) whose status is not paid: refused A01, difficulty A02, disputed A03, tech_error A04; PD / A07 only if every product is paid.",
+  "The brief does not define a hangup outcome; defaults used: verified NA / A01, unverified NC / N05."
+ ]
+}

@@ -7,6 +7,7 @@ Gizli brief'lere benzeyen ama **uydurma** girdiler. Amaç builder'ın kırılmad
 | `brief_c.md` | ham materyal tek dosyada (mail, poliçe, memo, kod listesi). Tarihli memo değişikliği, 3 bant, yüzde floor, farklı callback penceresi, farklı outcome/reason kodları |
 | `brief_d.md` + `openapi_d.json` | temiz spec formatı: 3 bant, `per_product`, müşteri callback'i (+ `no_callback_outcome`), posta kodu + doğum yılı, farklı outcome kodları. `spec_d_expected.json` |
 | `brief_e.md` + `openapi_e.json` | ham materyal (mail + poliçe + memo + dialler export): hafta gününe göre callback saatleri, 3 kimlik sorusu (ev numarası), memo'da bant sınırı + tarihe kadar geçerli deadline + kod yeniden adlandırma. `spec_e_expected.json` |
+| `brief_f.md` + `openapi_f.json` | şirket müşterisi (kitin persona'sındaki `company_number`/`founded_year`): farklı adlı çağrı değişkenleri (`account_ref`, `call_time`, `company_name`), 4 bant (takvim günü, ay sonu, iş günü), 3. deneme, `max:`/`fixed:` floor, aynı gün callback için en az 2 saat, promise/paid kapanışında reason (tam/kısmi), kodlu outcome tablosu. `spec_f_expected.json` |
 | `spec_pp.json`, `spec_cc.json` | `fbb scenarios` için altın spec varyantları (per_product, customer_callback) |
 | `openapi_c.json` | kimlik alanları `postcode`/`birth_year`, yanıt alanları yeniden adlandırılmış (`amount_due`, `minimum_due`, `identity_confirmed`, `attempts_left`), `create_promise`'e fazladan zorunlu `channel`, farklı enum'lar |
 
@@ -49,3 +50,5 @@ Build **başarılı**: 43 node, lint 0, uyarı 0, spec 0 uyumsuzluk.
 - C: 2 çıkarım, `spec_c_expected.json`'a karşı 0 PUAN farkı (7 maddenin hepsi doğru + memo tatili).
 - D: 3 çıkarım; tek fark (insan isteğinin aşaması) `extract.md` kuralıyla kapandı, 3. çıkarım 0 fark.
 - E: 2 çıkarım, birbirine karşı 0 PUAN farkı; bütün tuzaklar doğru (memo bant sınırları, tarihe kadar geçerli override, hafta günü saatleri, kod yeniden adlandırma, 3 kimlik sorusu).
+- F: ilk çıkarımda şemanın ifade edemediği 3 kural `unmapped`'e düştü → genel alanlar eklendi: `closing.promise_reason` / `promise_reason_partial` / `paid_reason` (promise ve paid kapanışları reason'sız gidiyordu: bu brief'te bütün promise/paid vakaları düşerdi), `callback.min_lead_minutes` (aynı gün en az X dk sonra). Soru başına yanlış hakkı için kod gerekmedi: başarısızlığı bankanın `wrong_answers_left`'i belirliyor. Yeni alanlarla 2 çıkarım → 0 PUAN farkı.
+- `test_rehearsal_briefs_build_cleanly`: C/D/E/F beklenen spec'leriyle cross_check boş, lint 0.
