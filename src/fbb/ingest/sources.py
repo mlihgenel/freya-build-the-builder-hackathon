@@ -116,11 +116,30 @@ def expand(paths: list[str | Path]) -> list[Path]:
 
         def key(f: Path, root: Path = path):
             name = f.name.lower()
-            first = 0 if name.startswith("brief") else 1 if name.startswith("readme") else 2
+            top = len(f.relative_to(root).parts) == 1  # alt klasörlerin README'leri öne geçmesin
+            first = 0 if top and name.startswith("brief") else 1 if top and name.startswith("readme") else 2
             return first, str(f.relative_to(root)).lower()
 
         out.extend(sorted(docs, key=key))
     return out
+
+
+BIG_CHARS = 60_000  # bundan uzun bir belge prompt'u boğar (11 Eki final: 707 KB'lık bir veri dökümü ≈ 180 bin token)
+SAMPLE_CHARS = 8_000
+TEXT_TWINS = (".md", ".markdown", ".txt")
+
+
+def _shorten(path: Path, text: str, files: list[Path]) -> str:
+    """Çok büyük bir belgeyi kısaltır: aynı adlı metin karşılığı varsa (ör. aynı tablonun .md hali) sadece bir örnek
+    kalır, yoksa baştan BIG_CHARS kadarı. Kısaltma belgenin içinde açıkça yazılır."""
+    if len(text) <= BIG_CHARS:
+        return text
+    twin = next((f for f in files if f != path and f.stem == path.stem and f.suffix.lower() in TEXT_TWINS), None)
+    if twin is not None:
+        return (text[:SAMPLE_CHARS] + f"\n[... shortened: this file has {len(text)} characters; the same content is "
+                f"in {twin.name}. Only the first {SAMPLE_CHARS} characters are shown here as a sample of its format.]")
+    return (text[:BIG_CHARS] + f"\n[... shortened: this file has {len(text)} characters; only the first {BIG_CHARS} "
+            "are shown.]")
 
 
 def read_sources(paths: list[str | Path]) -> str:
@@ -128,7 +147,7 @@ def read_sources(paths: list[str | Path]) -> str:
     parts = []
     for i, path in enumerate(files, 1):
         try:
-            text = read_document(path)
+            text = _shorten(path, read_document(path), files)
         except Exception as e:  # okunamayan belge build'i durdurmaz
             text = f"[could not read this file: {e}]"
         parts.append(f"===== DOCUMENT {i} of {len(files)}: {path.name} =====\n{text}\n")
