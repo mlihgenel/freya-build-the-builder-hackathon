@@ -7,6 +7,7 @@
 import DATA from "../data/test-customers.json";
 
 const CUSTOMERS = Object.fromEntries(DATA.customers.map((c) => [String(c.customerNo), c]));
+const CARD_SERVICES = new Set(["cards.balance", "statement.week.get", "statement.week.decide", "statement.week.change"]);
 const SERVICES = ["cards.list", "cards.balance", "statement.week.get", "statement.week.decide",
   "statement.week.change", "contact.email.get", "statement.pdf.send"];
 
@@ -80,25 +81,32 @@ export default {
     try { body = JSON.parse((await req.text()) || "{}"); } catch { return invalid("request body must be JSON"); }
     const d = (body && typeof body.data === "object" && body.data) || {};
 
-    const customerNo = d.customerNo;
-    const sample = isTemplate(customerNo);
-    if (!sample && empty(customerNo)) return invalid("customer number cannot be empty");
-    const c = sample ? DATA.customers[0] : CUSTOMERS[digits(customerNo)];
-    if (!c) return notFound(svc);
-    let entry = c.services[svc];
-    if (!entry) return notFound(svc);
-
-    if (!("http" in entry)) {  // kart numarasıyla anahtarlı
+    let entry;
+    if (CARD_SERVICES.has(svc)) {  // sözleşme: istekte yalnız cardNumber var (customerNo gelirse o da kullanılır)
       const card = d.cardNumber;
-      if (!sample && !isTemplate(card) && empty(card)) return invalid("card number cannot be empty");
-      entry = sample || isTemplate(card) ? Object.values(entry)[0] : byCard(entry, String(card));
+      if (!isTemplate(card) && empty(card)) return invalid("card number cannot be empty");
+      const known = empty(d.customerNo) || isTemplate(d.customerNo) ? null : CUSTOMERS[digits(d.customerNo)];
+      if (isTemplate(card)) entry = Object.values(DATA.customers[0].services[svc])[0];
+      else if (known && known.services[svc]) entry = byCard(known.services[svc], String(card));
+      if (!entry && !isTemplate(card)) {
+        const hits = DATA.customers.map((c) => c.services[svc] && byCard(c.services[svc], String(card))).filter(Boolean);
+        entry = hits.length === 1 ? hits[0] : undefined;
+      }
       if (!entry) return notFound(svc);
       if (!("http" in entry)) {  // hafta ile anahtarlı (statement.week.decide / change)
         const week = d.newStatementWeek;
-        if (!sample && !isTemplate(week) && empty(week)) return invalid("new statement week cannot be empty");
-        entry = sample || isTemplate(week) ? Object.values(entry)[0] : entry[String(parseInt(week, 10))];
+        if (!isTemplate(week) && empty(week)) return invalid("new statement week cannot be empty");
+        entry = isTemplate(week) ? Object.values(entry)[0] : entry[String(parseInt(week, 10))];
         if (!entry) return notFound(svc);
       }
+    } else {  // müşteri numarasıyla anahtarlı
+      const customerNo = d.customerNo;
+      const sample = isTemplate(customerNo);
+      if (!sample && empty(customerNo)) return invalid("customer number cannot be empty");
+      const c = sample ? DATA.customers[0] : CUSTOMERS[digits(customerNo)];
+      if (!c) return notFound(svc);
+      entry = c.services[svc];
+      if (!entry) return notFound(svc);
     }
     const delay = Number(entry.delaySeconds || 0);
     if (delay > 0) await new Promise((r) => setTimeout(r, delay * 1000));

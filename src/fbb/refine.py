@@ -31,7 +31,9 @@ def _prompt(cases: list[str], work: Path, mock_url: str, slot: str, minutes: int
 - Your work folder: {work} — keep the workflow in {work / 'workflow.json'}; write your decisions to {work / 'DECISIONS.md'}
 - Mock address of the bank's services (every tool URL starts with it): {mock_url}
 - Slot name for save/chat: {slot}
-- Time budget: about {minutes} minutes. Save a valid version after every fix; stop testing in time.
+- Time budget: {minutes} minutes, until {time.strftime("%H:%M", time.localtime(time.time() + minutes * 60))} local time
+  (check with `date`). Use all of it: keep testing every flow branch, every service error and every example
+  conversation, and fixing, until about two minutes before that time. Save a valid version after every fix.
 
 Follow the builder knowledge in your system prompt step by step."""
 
@@ -79,6 +81,8 @@ def refine(cases: list[str], wf_path: Path | None, mock_url: str, slot: str, tra
     """`wf_path`'teki workflow'u Claude'a test ettirip düzelttirir; `wf_path` yoksa workflow'u Claude baştan yazar.
     Dönen yol: Claude'un bıraktığı workflow dosyası (olmayabilir)."""
     work = config.OUT / f"{slot}-refine"
+    if wf_path is None and work.exists():  # baştan yazım: önceki çalıştırmanın dosyaları kullanılmaz
+        shutil.rmtree(work)
     work.mkdir(parents=True, exist_ok=True)
     (work / "workflow.json").unlink(missing_ok=True)
     (work / "last_saved.json").unlink(missing_ok=True)
