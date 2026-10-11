@@ -5,7 +5,7 @@
 > - Yarım kalan madde `[~]` ile işaretlenir ve ne kaldığı yazılır.
 > - **"📍 Şu an"** satırı her adımda güncellenir.
 
-**📍 Şu an:** Faz 1 ✅ tamamlandı (11 Eki ~01:45). Sıradaki: Faz 2.1 (stiller: `pieces`)
+**📍 Şu an:** Faz 4 ✅, Faz 2 ✅, Faz 3.1/3.3 ✅ (11 Eki ~05:00). Son sürüm: A 10/10 ve B 3/3 pass³, talkative A 10/10 · B 3/3, PUB-05 dört stilde 4/4. Sıradaki: Faz 3.2 (müşteri callback'i canlı), Faz 5 (Brief C/D provası), Faz 6.
 
 **Son durum (11 Eki ~01:00):**
 - `e2e58b2`: altın spec ile A 10/10 ve B 3/3 pass³.
@@ -57,13 +57,21 @@ Amaç: finale en yakın testleri koşmak, sorunları **genel** olarak düzeltmek
 **Çıkış:** LLM spec'iyle A ≥ 9/10 ve B 3/3 pass³; 3 çıkarımda puan alanlarında fark yok.
 
 ## Faz 2: Konuşma stilleri (son sürüm)
-- [ ] 2.1 `pieces`: A (dev-a) ×1, B (dev-b) ×1
-- [ ] 2.2 `in_words`: A ×1, B ×1
-- [ ] 2.3 `asks_back`: A ×1, B ×1
-- [ ] 2.4 `corrects`: A ×1, B ×1
-- [ ] 2.5 `talkative`: A ×1, B ×1
-- [ ] 2.6 Düşen her vakanın transcript analizi ve sınıflandırması (`docs/10` §6)
-- [ ] 2.7 Düzeltmeler: önce `--only X --style Y --reps 3`, sonra bütün brief `--reps 3`
+- [x] 2.1 `pieces`: A (dev-a) ×1, B (dev-b) ×1
+- [x] 2.2 `in_words`: A ×1, B ×1
+- [x] 2.3 `asks_back`: A ×1, B ×1
+- [x] 2.4 `corrects`: A ×1, B ×1
+- [x] 2.5 `talkative`: A ×1, B ×1
+- [x] 2.6 Düşen her vakanın transcript analizi ve sınıflandırması (`docs/10` §6)
+- [x] 2.7 Düzeltmeler: önce `--only X --style Y --reps 3`, sonra bütün brief `--reps 3`
+
+**Sonuç (11 Eki ~03:00–04:30, Mert):** ilk tur (×1): pieces 8/10 · 3/3; in_words 10/10 · 3/3; asks_back 8/10 · 2/3; corrects 10/10 · 2/3; talkative 7/10 · 2/3. Düşenlerin transcript'leri okundu; düzeltmeler (hepsi genel, testli):
+- **Kimlik:** ay içermeyen tek sayı ("It is 1…") eksik cevap sayılır; ret açıklamasında ve geri soruya verilen cevapta güvenlik sorusu tekrarlanmaz (hakem her tekrarı ayrı soru sayıyordu); kimlik node'larında tur sınırı 12 → 30 (talkative'de sınır doluyordu).
+- **İkna:** belirsiz cevap ("you tell me", soru) `next_offer`'da ret sayılmaz; kesik mesajda `next_offer` çağrılmaz.
+- **Kesik mesajlar** (simülasyondaki konuşkan müşterinin mesajları sık sık yarıda kesiliyor): mesajda cevap varsa önce cevap işlenir; yoksa kısa, değişen bir dinleme cevabı ("Mm-hm.", "I'm listening."), soru ya da teklif tekrarı yok.
+- **Hardship:** yukarıda (4.6).
+- Hedefli ölçümler: asks_back PUB-03/05/07 3/3, pieces PUB-03/05/07 3/3, talkative B 3/3, asks_back B 3/3; regresyon A 10/10, B 3/3 pass³.
+- Bilinen sim kaynaklı düşüşler: pieces PUB-09'da müşteri hiçbir şey söylemeden kapattı; talkative'de persona mesajları kesilip baştan başlıyor.
 
 **Çıkış:** her stilde A ≥ 9/10 ve B ≥ 2/3; bizden kaynaklı ve tekrarlayan hata yok.
 **Beklenen sorun alanları:**
@@ -73,22 +81,31 @@ Amaç: finale en yakın testleri koşmak, sorunları **genel** olarak düzeltmek
 - tool çağrısından önce tek başına söylenen "I" parçası.
 
 ## Faz 3: Kod yolları (gizli brief tipi senaryolar, birim/graf testi)
-- [ ] 3.1 `per_product` kayıt + `next_offer`: `agreed` → anında read-back → kayıt → sıradaki ürünün teklifi. Bugün test edilmedi, büyük ihtimalle eksik; gerekirse `flow.next_offer` düzeltilir
+- [x] 3.1 `per_product` kayıt + `next_offer` → eksikti: kabul edilen ürün kaydedilmeden sıradaki ürüne geçiliyordu (fiilen toplu kayıt). Düzeltme: per_product'ta kabul → o ürün (+ bekleyen durumlar) hemen read-back ve kayıt; kayıttan sonra 'kaydedildi' + sıradaki ürünün 1. teklifi tek cümlede (`next_offer_say`); propose edilenler `offers_json.proposed`'da (çift öneri yok). Testler: `test_per_product_with_next_offer`, `test_per_product_last_product_agreed_after_refusals`. Canlı prova (`mert-pp`, spec_ab + per_product): PUB-12, PUB-13 2/2, transcript'te ürün başına kayıt görüldü (11 Eki ~05:00)
 - [ ] 3.2 Müşteri callback'i (`customer_callback`) + `next_offer`
-- [ ] 3.3 Bir üründe dispute/paid, diğerinde ret: `propose_results` ↔ `offers_json` uyumu
+- [x] 3.3 Bir üründe dispute/paid, diğerinde ret: `propose_results` ↔ `offers_json` uyumu → `merge_offer_results`: modelin listesinde olmayan ürünler next_offer sonuçlarından tamamlanır (`test_propose_results_keeps_offers_already_agreed`)
 - [ ] 3.4 Teklif sırasında transfer (B kural 10): kaydedilmemiş anlaşma kaydedilmez, not yazılmaz
 - [ ] 3.5 "No speakable content" denetimi: her model tool'u bir geçişle bitiyor mu (test)
 - [ ] 3.6 Kod servisi kesintisinde `offer_step` ve `propose_step` → `fallback_close` (test)
 
-## Faz 4: Farklı takvim günleri
-- [ ] 4.1 Runtime birim testleri: Cuma 2026-10-16, Cuma 2026-10-23 (26 Ekim tatil öncesi) ve Çarşamba 2026-12-23 (yıl sonu tatilleri) için `prep_account` ve `day_table` beklentileri
-- [ ] 4.2 `tests/fixtures/days.json`: PUB-01, 02, 06, 10, 11, 12 (göreli tarih) ve 03, 05, 08, 09 için gün başına **elle hesaplanmış** beklenti ve checks; her satırda dayandığı kural yazılı
-- [ ] 4.3 `fbb days <slot> --brief A --now …` runner (`src/fbb/days.py`). Kit fonksiyonlarını import eder: `freya.run_simulation`, `create_personas`, `score.http`, `score_ledger`, `run_cases.persona_for`. Sadece `now` değişir. Persona kaydı `.personas-days.json` (gitignore)
-- [ ] 4.4 3 gün × A ×1, düşenler ×3
-- [ ] 4.5 3 gün × B ×1, düşenler ×3
-- [ ] 4.6 Düzeltmeler (kod: önce birim testi; model: transcript)
+- [x] 3.7 (11 Eki ~02:30, Mert) Ret turu gecikmesi: tool + `offer_step` + `commit_fix` = 3 code node → ~10 sn sessizlik (B koşusu, medyan en yavaş tur 10 sn). `offer_step` artık bayrağı kendisi temizleyip `negotiate_fix_say`'e gidiyor (`offer_go`); medyan 2 sn'ye indi (`test_offer_goes_straight_to_speech`)
+- [x] 3.8 (11 Eki ~02:35, Mert) Model sadece 1. ürün kabul edilmişken `agreed_all` dedi; read-back reddinden sonra teklif durumu kapalı kaldığı için diğer ürünlere hiç teklif yapılmadı. `readback_reset` son `next_offer`'ı geri alıyor (`offers_prev`), `agreed_all` açıklaması netleşti (`test_readback_rejection_reopens_offers`)
 
-**Çıkış:** üç günde ledger farkı yok ya da sebebi ayrılmış ve düzeltilmiş.
+## Faz 4: Farklı takvim günleri
+- [x] 4.1 Runtime birim testleri: Cuma 2026-10-16, Cuma 2026-10-23 (26 Ekim tatil öncesi) ve Çarşamba 2026-12-23 (yıl sonu tatilleri) için `prep_account` ve `day_table` beklentileri
+- [x] 4.2 `tests/fixtures/days.json`: PUB-01, 02, 06, 10, 11, 12 (göreli tarih) ve 03, 05, 08, 09 için gün başına **elle hesaplanmış** beklenti ve checks; her satırda dayandığı kural yazılı
+- [x] 4.3 `fbb days <slot> --brief A --now …` runner (`src/fbb/days.py`). Kit fonksiyonlarını import eder: `freya.run_simulation`, `create_personas`, `score.http`, `score_ledger`, `run_cases.persona_for`. Sadece `now` değişir. Persona kaydı `.personas-days.json` (gitignore)
+- [x] 4.4 3 gün × A ×1, düşenler ×3
+- [x] 4.5 3 gün × B ×1, düşenler ×3
+- [x] 4.6 Düzeltmeler (kod: önce birim testi; model: transcript)
+
+**Sonuç (11 Eki ~02:55, Mert):**
+- 4.1: `tests/test_days.py` (26 test). Bağımsız takvim (builder kodu yok) ile runtime aynı deadline, ilk teklif, kaydırma, callback günü ve `day_table` etiketlerini üretiyor. Kod düzeltmesi gerekmedi.
+- 4.2: 3 gün × 13 vaka = 39 senaryo: Cuma 16 Eki, Cuma 23 Eki (Pzt 26 tatil), Çar 23 Ara (25 Ara ve 1 Oca tatil). Kenar durumlar: Cuma "yarın" (Cumartesi), tatildeki Pazartesi için callback, 25 Aralık'ı ödeme günü olarak söylemek.
+- 4.4/4.5: A 10/10, 10/10, 9/10; B 3/3, 3/3, 3/3 → **38/39**. Tek düşüş tarihten bağımsız PUB-05 (destek teklifi iki kez).
+- 4.6: PUB-05 için önce prompt kuralı (transfer teklifi bir kez) → PUB-05 `--reps 3` 3/3, corrects 1/1, talkative 1/1. pieces'te yine tekrarlandı → hardship `next_offer`'a bağlandı. İlk sürümde kod teklifi tts ile söylüyordu; model teklifi brief kuralıyla zaten kendisi yaptığı için çift teklif oldu. Son hali: teklifi model bir kez yapar, ret `next_offer(result='hardship')` ile gelince kalan bütün ürünler `negotiation.hardship_status` ile hemen biter (testler: `test_hardship_*`).
+
+**Çıkış:** üç günde ledger farkı yok ya da sebebi ayrılmış ve düzeltilmiş. ✅
 
 ## Faz 5: Uydurma brief D ve chat provası
 - [ ] 5.1 `tests/fixtures/variants/brief_d.md` + `openapi_d.json` (temiz spec formatı; 3 ürün, 3 bant, `per_product`, müşteri callback'i, farklı outcome tablosu, posta kodu + doğum yılı) + `spec_d_expected.json`

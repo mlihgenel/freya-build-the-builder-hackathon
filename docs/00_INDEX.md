@@ -16,7 +16,8 @@ Freya × YC "Build the Builder" (10–11 Ekim 2026) builder'ının dokümanları
 11. `11_REVIEW.md`: review ve madde madde uygulama durumu
 12. `12_RAPOR.md`: review düzeltmeleri ve ölçüm raporu (10 Ekim)
 13. `13_FINAL_HAZIRLIK.md`: **finale hazırlık planı ve takibi** (kaldığımız yer: "📍 Şu an" satırı)
-14. `BUGFIX_LOG.md`: gizli brief'ler açıldıktan sonraki değişiklikler
+14. `14_RAPOR_11EKIM.md`: farklı günler, konuşma stilleri ve per_product düzeltmeleri raporu (11 Ekim)
+15. `BUGFIX_LOG.md`: gizli brief'ler açıldıktan sonraki değişiklikler
 
 ## Hızlı komutlar
 ```bash
@@ -53,3 +54,4 @@ uv run fbb chat brief-a "Hello?" --case PUB-01                                  
 - **11 Eki ~00:30: ikna teklifleri koda taşındı** (`next_offer` + `offer_step`, `propose_step`): ürün sırası, deneme sayısı ve teklif cümleleri kodda; model sadece müşterinin cevabını bildirir. Ölçüm (dev-a/dev-b, altın spec): **A 10/10 pass³ (iki kez), B 3/3 pass³**. Workflow ≈301/305 KB (önce 315/319). Stiller bu sürümle ölçülmedi.
 - **11 Eki ~01:45, finale hazırlık Faz 1 ✅** (`13_FINAL_HAZIRLIK.md`): Claude'un çıkardığı spec'le (finaldeki zincir) A **10/10** ve B **3/3** pass³. Üç ayrı çıkarımda puan alanlarında fark yok (`fbb specdiff`). Build: A 87 sn / $0.63, A+B 100 sn / $0.91.
 - Sonuç tablosu ve test komutları: `10_TEST_REHBERI.md` §9.
+- **11 Eki ~05:00 (Mert):** Faz 4 (3 farklı gün, `fbb days`) 38/39; Faz 2 (5 stil) düzeltmelerle talkative A 10/10, B 3/3; hardship ve `per_product` + `next_offer` düzeldi. Son sürüm: A **10/10** ve B **3/3** pass³. Ayrıntı `13_FINAL_HAZIRLIK.md`, `10_TEST_REHBERI.md` §9.

@@ -245,6 +245,15 @@ staging-app.freyavoice.ai → çağrı kayıtları. Simülasyon çağrıları "S
 | 00:00 | dev-b (v3) | Brief B × 3 | 2/3 | PUB-13: "ikisi de 30 Ekim" → kredi 16 Ekim'e kaydedildi (gerileme) → `agreed_all` |
 | 00:10 | dev-b (v4, agreed_all) | Brief B × 3 | **3/3 pass³** | |
 | 00:15 | dev-a (v4) | Brief A × 3 | **10/10 pass³** | en yavaş tur medyanı 2–3 sn |
+| 02:22 (11 Eki) | mert-b / mert-a (pull sonrası, propose birleştirme) | B ×1; pieces PUB-01,06 ×1 | 3/3; 2/2 | B'de en yavaş tur medyanı 10 sn → ret turunda 3 code node |
+| 02:26 | mert-b (offer_step doğrudan) | B ×1 | 2/3 | medyan 2 sn. PUB-12: model yanlışlıkla `agreed_all`; read-back reddinden sonra teklif durumu kapalıydı |
+| 02:28 | mert-b (offers_prev geri alma) | B ×1 | **3/3** | en yavaş tur 7 sn (≈4 sn model düşünmesi) |
+| 02:48–02:55 | mert-a / mert-b | `fbb days` 3 gün (16 Eki Cuma, 23 Eki Cuma + Pzt tatil, 23 Ara) × A/B | A 10/10, 10/10, 9/10; B 3/3 ×3 → **38/39** | tek düşüş PUB-05 (tarihten bağımsız, destek teklifi iki kez) |
+| 03:00–03:45 | mert-a / mert-b | 5 stil × A/B ×1 | pieces 8/10·3/3, in_words 10/10·3/3, asks_back 8/10·2/3, corrects 10/10·2/3, talkative 7/10·2/3 | düşüşler sınıflandırıldı → `docs/13` Faz 2 |
+| 03:50–04:20 | düzeltmelerden sonra | talkative ×1, asks_back ×1, hedefli PUB-03/05/07 | talkative B 3/3, asks_back B 3/3, asks_back ve pieces PUB-03/05/07 3/3 | |
+| 04:20 | aynı sürüm | A / B `--reps 3` | **10/10**, **3/3** | |
+| 04:30–04:55 | son sürüm (hardship sade, değişken dinleme cevabı) | talkative A/B, PUB-05 × 4 stil, A/B `--reps 3` | **10/10**, **3/3**, **4/4**, **10/10**, **3/3** | bu grupta hiç düşüş yok |
+| 05:00 | mert-pp (spec_ab + per_product) | PUB-12, PUB-13 | 2/2 | ürün başına kayıt transcript'te doğrulandı |
 | 00:40 | dev-a-llm / dev-b-llm | Claude ile tam build (A, A+B) + `specdiff` | lint 0; PUAN farkı A 0, B 1 | B: `hangup_unverified` farkı (brief tanımlamıyor) |
 | 00:42 | dev-a-llm | Brief A × 3 | 9/10 | PUB-05 2/3: `propose_results` öncesi teselli tekrarı → texts kuralı |
 | 00:52 | dev-b-llm | Brief B × 3 | **3/3 pass³** | |
