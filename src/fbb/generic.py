@@ -1,6 +1,6 @@
 """Genel yol: vaka kitteki tahsilat formatında değilse (yedi tahsilat tool'u yok) workflow'u Claude yazar.
 
-Final formatı (11 Eki): vaka başka bir iş (ör. ekstre borcu sorgulama) ve başka bir API olabilir. PolicySpec şeması
+Bir vaka tahsilattan farklı bir çağrı tipi ve farklı bir API olabilir. PolicySpec şeması
 tahsilata özel olduğu için bu durumda:
   1. Claude vakanın API'sini (servis/entegrasyon belgesinden) OpenAPI 3 olarak çıkarır,
   2. Claude, Freya'nın workflow belgelerini ve örnek agent'ı referans alarak workflow JSON'unu yazar,
