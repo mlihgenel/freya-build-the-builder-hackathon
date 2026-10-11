@@ -5,7 +5,9 @@
 > - Yarım kalan madde `[~]` ile işaretlenir ve ne kaldığı yazılır.
 > - **"📍 Şu an"** satırı her adımda güncellenir.
 
-**📍 Şu an (11 Eki ~14:45):** Freya API kesintide (kimlikli çağrılar 504/403) → Freya'sız işler yapıldı: runtime review + 2 düzeltme (3.14), istek alanı eşlemesi (3.15), Brief E (5.6), runbook kesinti prosedürleri. Ölçülmeyen: `check_offer_answer`, cevaplanmamış soru kuralı ve 3.14 sonrası A/B `--reps 3` (13:00 koşusu platform yüzünden geçersiz). Platform düzelince: slotları kur → A/B `--reps 3` → talkative, SC-01..05 ×1 → Faz 7.
+**📍 Şu an (11 Eki ~17:30): DONDURULDU.** Faz 0–7 ✅. Son sürüm: altın spec B 3/3 pass³; Claude spec'i B 3/3 pass³, A 7/10 pass³ (3 düşüş: platform sessizliği, robot sorusu zamanlama yarışı, durum cümlesi → düzeltildi: PUB-08 3/3, A-LLM ×1 10/10). Platform 16:20–17:15 arası yavaştı (medyan en yavaş tur 4–61 sn). Bundan sonra sadece bug fix; final penceresi `docs/07`.
+
+**Önceki (14:45):** Freya API kesintide (kimlikli çağrılar 504/403) → Freya'sız işler yapıldı: runtime review + 2 düzeltme (3.14), istek alanı eşlemesi (3.15), Brief E (5.6), runbook kesinti prosedürleri. Ölçülmeyen: `check_offer_answer`, cevaplanmamış soru kuralı ve 3.14 sonrası A/B `--reps 3` (13:00 koşusu platform yüzünden geçersiz). Platform düzelince: slotları kur → A/B `--reps 3` → talkative, SC-01..05 ×1 → Faz 7.
 
 **Önceki (05:00):** Faz 4 ✅, Faz 2 ✅, Faz 3.1/3.3 ✅ (11 Eki ~05:00). Son sürüm: A 10/10 ve B 3/3 pass³, talkative A 10/10 · B 3/3, PUB-05 dört stilde 4/4. Sıradaki: Faz 3.2 (müşteri callback'i canlı), Faz 5 (Brief C/D provası), Faz 6.
 
@@ -135,9 +137,12 @@ Amaç: finale en yakın testleri koşmak, sorunları **genel** olarak düzeltmek
 - [~] 6.5 Kredi: API kredi bilgisini vermiyor (`/api/v2/workspaces`'te yok); panelden kontrol edilmeli. Workspace'te ~15 workflow (sınır 200)
 
 ## Faz 7: Dondurma (Paz 18:00 TR)
-- [ ] 7.1 Bütün slotlar son commit'le yeniden kurulur
-- [ ] 7.2 LLM spec'iyle A ve B `--reps 3` son ölçüm
-- [ ] 7.3 `docs/00` ve `docs/07` "donduruldu"; kullanıcı commit ve push yapar
+- [x] 7.1 Bütün slotlar son commit'le yeniden kurulur → (11 Eki 16:23, Mert, `e2957b5` + `--rerun-if-slow`) mert-a/mert-b altın spec, mert-a-llm/mert-b-llm Claude spec'i: 45 node, lint 0, geri okuma 0 fark. LLM build: A 96 sn / $0.88, A+B 110 sn / $0.45. `specdiff`: A tek PUAN farkı `hangup_unverified` (brief tanımlamıyor, Faz 1'deki gibi), B 0 PUAN farkı. Regresyon (altın spec, platform yavaş: medyan en yavaş tur 13–61 sn, en kötü 382 sn): A 4/10 — **bütün düşüşler 60–382 sn sessizlikte müşterinin kapatması**, 2. koşu (medyan 18 sn) 10/10; B **3/3** pass³
+- [x] 7.2 LLM spec'iyle A ve B `--reps 3` son ölçüm → (11 Eki 16:54–17:07, platform yavaş: medyan en yavaş tur 4–19 sn) **B 3/3 pass³**; A 7/10:
+  - PUB-01: 67 sn sessizlikte müşteri kapattı (platform).
+  - PUB-04: müşteri robot sorusunu 'One moment' tts'i sırasında sordu, ardından sabit borç cümlesi söylendi ve soru cevapsız kaldı (zamanlama yarışı, açık risk).
+  - PUB-08: brief'in 'ödemeler bir iş günü içinde görünür' cümlesi söylenmedi. Kök neden: 'propose_results'tan önce konuşma' kuralı ile durum cümlesinin modele bırakılması çakışıyordu. Düzeltme: durumun `say` cümlesini kapanış/ara konuşma söyler (`status_say`, `announce`), görev metni 'sistem söyler' diyor (`test_status_sentence_is_said_by_the_system`). Ölçüm (son kod): PUB-08 A-LLM `--reps 3` **3/3**, A-LLM ×1 **10/10**.
+- [x] 7.3 `docs/00` ve `docs/07` "donduruldu"; commit ve push (11 Eki ~17:30, Mert). Son kod eklemeleri: `fbb cases --rerun-if-slow N` (kitin seçeneği), durum cümlesini sistem söyler. Bundan sonra sadece bug fix (`BUGFIX_LOG.md`)
 
 ---
 

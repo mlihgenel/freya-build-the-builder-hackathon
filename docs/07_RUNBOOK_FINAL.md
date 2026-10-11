@@ -17,7 +17,8 @@
 | F7 | stiller + 3 tekrar | bilinmeyen sebeple 3/3 altında vaka yok | 🟡 5 stil × A/B ölçüldü, düzeltmelerden sonra talkative A 10/10 · B 3/3, düşen vakalar hedefli 3/3 (11 Eki 05:00, `14_RAPOR_11EKIM.md`). pieces/in_words/asks_back/corrects son sürümle bütün brief olarak koşulmadı (13 Adım 6) |
 | F5b | LLM spec'iyle uçtan uca (finaldeki zincir) | A ≥ 9/10, B 3/3 pass³; çıkarımlar arası puan farkı yok | ✅ A 10/10, B 3/3; 3 çıkarım 0 fark (11 Eki 01:45) |
 | F8 | teslim provası: temiz kopyadan 2 brief art arda | tek komut, brief başına ≤ 10 dk | ✅ 11 Eki 10:34: temiz klon, A+B 109 sn / $1.00, lint 0, geri okuma 0 fark, export + trace doğru (13 §6.2) |
-| — | **Özellik dondurma: Pazar 18:00 TR** | | |
+| F9 | dondurma provası: son commit'le slotlar, Claude spec'iyle A ve B `--reps 3` | A ≥ 9/10, B 3/3 | ✅ 11 Eki 17:15: B 3/3 pass³ (altın ve Claude spec'i); A-LLM 7/10 → düşüşlerin 1'i platform, 1'i zamanlama yarışı, 1'i düzeltildi (PUB-08 3/3, A-LLM ×1 10/10) (`13` Faz 7) |
+| — | **Özellik dondurma: Pazar 18:00 TR — DONDURULDU 11 Eki ~17:30** | | |
 
 ## Final penceresi (Pazar 20:00–23:00 TR)
 
@@ -66,5 +67,6 @@
 | Freya 5xx ya da `1010` | Tekrar dene. `User-Agent`'ı `freya.py` ayarlıyor |
 | Mock'a erişilemiyor (timeout, DNS) | VPN aç; olmazsa DNS 1.1.1.1; olmazsa telefondan hotspot. Kontrol: `curl -s -o /dev/null -w '%{http_code}' https://freya-bank-mock.freyavoice.workers.dev/v1/practice/sessions` (401 = erişim var) |
 | Deploy sırasında Freya 5xx / zaman aşımı (11 Eki'de sık) | Çıkarım tekrarlanmaz: build spec'i deploy'dan önce yazar. `uv run build-agent final/<x>/brief.md --tools final/<x>/openapi.json --spec out/final-<x>.spec.json --slot final-<x>` (saniyeler, LLM yok). Teslimde iki trace birlikte verilir: çıkarımlı olan + deploy eden. BUGFIX_LOG'a "platform kesintisi, kod değişmedi" yazılır |
+| Smoke ölçümünde kit "the phone agent was slow" diyor | Düşüşler büyük olasılıkla platform sessizliği (müşteri kapatır). `fbb cases … --rerun-if-slow 1` yavaş koşuyu atıp 5 dk sonra tekrarlar (organizatörün yöntemi). Ajan düzeltilmez |
 | Simülasyon / chat 504 veriyor, takılıyor | Simülasyon çökmüş olmayabilir (02). `fbb` koşucusu GET'leri ~5 dk tekrar dener, 10 dk'yı aşan simülasyonu iptal eder. Hiçbir müşteride tool çağrısı yoksa ya da "no verdict" geliyorsa bu kesintidir: ajan **düzeltilmez**, beklenir |
 | Platform workflow'un bir kısmını sildiyse | Trace'teki `freya_readback` farkına bak, `02`'yi güncelle |
