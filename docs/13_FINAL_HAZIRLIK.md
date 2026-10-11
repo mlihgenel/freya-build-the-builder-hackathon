@@ -143,6 +143,7 @@ Amaç: finale en yakın testleri koşmak, sorunları **genel** olarak düzeltmek
   - PUB-04: müşteri robot sorusunu 'One moment' tts'i sırasında sordu, ardından sabit borç cümlesi söylendi ve soru cevapsız kaldı (zamanlama yarışı, açık risk).
   - PUB-08: brief'in 'ödemeler bir iş günü içinde görünür' cümlesi söylenmedi. Kök neden: 'propose_results'tan önce konuşma' kuralı ile durum cümlesinin modele bırakılması çakışıyordu. Düzeltme: durumun `say` cümlesini kapanış/ara konuşma söyler (`status_say`, `announce`), görev metni 'sistem söyler' diyor (`test_status_sentence_is_said_by_the_system`). Ölçüm (son kod): PUB-08 A-LLM `--reps 3` **3/3**, A-LLM ×1 **10/10**.
 - [x] 7.3 `docs/00` ve `docs/07` "donduruldu"; commit ve push (11 Eki ~17:30, Mert). Son kod eklemeleri: `fbb cases --rerun-if-slow N` (kitin seçeneği), durum cümlesini sistem söyler. Bundan sonra sadece bug fix (`BUGFIX_LOG.md`)
+- [x] 7.4 (11 Eki 17:30–17:40, Mert, dondurmadan önce) Platform hızlıyken Claude spec'li A `--reps 3`: 6/10 → düşüşlerin hepsi platform (2× 60 sn sessizlik, 2× `Failed to reach snekbox`). Biri bizde zayıflık gösterdi: create_promise başarılı olduktan hemen sonra `rec_step`'te kod servisi düşünce yedek kapanış eski 'refused' outcome'unu gönderdi. Düzeltme: `rec_step` hatası + son kayıt başarılı → kodsuz `fallback_promise` (promise outcome, başarı cümlesi + veda). Test: `test_code_failure_right_after_recorded_promise_closes_as_promise`; dryRun + geri okuma 0 fark
 
 ---
 
