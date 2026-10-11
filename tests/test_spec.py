@@ -97,3 +97,28 @@ def test_kit_api_retries_transient_get_errors(monkeypatch):
     with pytest.raises(RuntimeError):
         mod.api("POST", "/y")
     assert calls[-1] == "POST" and len(calls) == 3
+
+
+def test_kit_api_cancels_a_stuck_simulation(monkeypatch):
+    """Bekçi: 10 dk'dan uzun 'running' kalan simülasyon iptal edilir; biten simülasyona dokunulmaz."""
+    import types
+
+    from fbb import kitapi
+
+    sid = "b9c8aef3-133f-42f3-a3d5-3fe6582e8b45"
+    calls, now = [], [1000.0]
+
+    def fake(method, path, body=None, **params):
+        calls.append((method, path))
+        return {"simulation": {"id": sid, "status": "running"}}
+
+    monkeypatch.setattr("time.time", lambda: now[0])
+    mod = types.SimpleNamespace(api=fake)
+    kitapi._retry_gets(mod)
+    mod.api("GET", f"/api/v2/simulations/{sid}")
+    now[0] += kitapi.SIM_WATCHDOG_S - 1
+    mod.api("GET", f"/api/v2/simulations/{sid}")
+    assert not any(p.endswith("/cancel") for _, p in calls)
+    now[0] += 2
+    mod.api("GET", f"/api/v2/simulations/{sid}")
+    assert calls[-1] == ("POST", f"/api/v2/simulations/{sid}/cancel")

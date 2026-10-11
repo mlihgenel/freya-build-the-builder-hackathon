@@ -14,6 +14,7 @@ from pathlib import Path
 from fbb import config
 
 STATE_FILE = config.ROOT / ".freya-agents.json"
+SIM_WATCHDOG_S = 600  # bir simülasyon en çok bu kadar 'running' kalabilir (çağrı sınırı 420 sn)
 
 
 @lru_cache(maxsize=1)
@@ -35,6 +36,7 @@ def _retry_gets(mod) -> None:
     kesintileri 2 dk'yı aştı (11 Eki)."""
     if getattr(mod.api, "_fbb_retry", False):
         return
+    import re
     import time
     import urllib.error
 
@@ -53,8 +55,30 @@ def _retry_gets(mod) -> None:
                 print(f"[fbb] {method} {path}: {str(e)[:60]} → {wait} sn sonra tekrar", flush=True)
                 time.sleep(wait)
 
+    started: dict[str, float] = {}
+
+    def watched(method, path, body=None, **params):
+        """Bekçi: simülasyon 10 dk'dan uzun 'running' kalırsa iptal edilir (11 Eki: çağrısı hiç başlamayan bir
+        simülasyon sonsuza kadar 'running' kaldı; kitin döngüsünde zaman aşımı yok ve workspace tek simülasyon
+        çalıştırabildiği için sonraki koşular da bekliyordu). Belgelenmemiş uç nokta: POST .../cancel."""
+        out = api(method, path, body, **params)
+        m = re.fullmatch(r"/api/v2/simulations/([0-9a-f-]{36})", path)
+        if method == "GET" and m and isinstance(out, dict):
+            s = out.get("simulation") or out
+            if s.get("status") in ("completed", "failed", "paused"):
+                started.pop(m.group(1), None)
+            elif time.time() - started.setdefault(m.group(1), time.time()) > SIM_WATCHDOG_S:
+                print(f"[fbb] simülasyon {m.group(1)[:8]} {SIM_WATCHDOG_S} sn'dir bitmedi → iptal", flush=True)
+                try:
+                    orig("POST", f"/api/v2/simulations/{m.group(1)}/cancel", {})
+                except Exception as e:  # iptal olmazsa kitin döngüsü beklemeye devam eder
+                    print(f"[fbb] iptal edilemedi: {str(e)[:80]}", flush=True)
+                started.pop(m.group(1), None)
+        return out
+
     api._fbb_retry = True
-    mod.api = api
+    watched._fbb_retry = True
+    mod.api = watched
 
 
 def validate(name: str, workflow: dict):
@@ -110,7 +134,7 @@ def ledger(customer_id: str) -> dict:
 
 
 def run_cases(agent_id: str, *, brief: str = "", only: str = "", reps: int = 1, style: str = "",
-              out: Path | None = None, timeout_s: int = 1500) -> dict:
+              out: Path | None = None, timeout_s: int = 3600) -> dict:
     """Kitin run_cases.py'sini çalıştırır; --out JSON'unu döner."""
     config.load_env()
     import time
