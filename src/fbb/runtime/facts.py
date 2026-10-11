@@ -154,7 +154,7 @@ def prep_account(vars, RT):
                      + "; floor " + (fmt_money(p["floor"], RT) + " (" + str(p["floor"]) + ")" if p["floor"] else "none")
                      + "; latest allowed promise date (deadline) " + p["deadline"] + " " + weekday_name(p["deadline"], RT)
                      + "; persuasion attempts allowed " + str(p["max_attempts"]))
-        lines.append("    proposals after the first ask: " + str(len(p["attempts"])) + " (made by the system via next_offer)")
+        lines.append("    proposals after the first ask: " + str(len(p["attempts"])) + " (made by the system via check_offer_answer)")
     vars["product_facts"] = "\n".join(lines) if lines else "- no late products were returned"
     latest = max([to_date(p["deadline"]) for p in plans] or [today])
     vars["day_table"] = day_table(today, add_business_days(latest, 5, RT["cal"]), RT["cal"], plans, RT)
@@ -192,5 +192,7 @@ def prep_callback(vars, RT, kind="third_party"):
     vars["cb_facts"] = text
     vars["cb_kind"] = kind
     vars["cb_days"] = ",".join(d.isoformat() for d in days)
+    vars["cb_window_say"] = " or ".join("on " + spoken_date(d, RT) + " between " + " and ".join(callback_window(d, cb))
+                                        for d in days)
     vars["cb_now_min"] = str(minutes)
     vars["today_iso"] = today.isoformat()

@@ -437,8 +437,8 @@ def test_customer_callback(cat):
     v = {"now": "2026-10-14T11:00"}
     run_snippet(_code_of(n["cust_cb"]), vars=v)
     assert v["cb_kind"] == "customer"
-    v.update({"propose_callback_args.date": "2026-10-15", "propose_callback_args.time": "11:00"})
-    run_snippet(_tool_code(n["cust_cb_talk"], "propose_callback"), vars=v)
+    v.update({"check_callback_time_args.date": "2026-10-15", "check_callback_time_args.time": "11:00"})
+    run_snippet(_tool_code(n["cust_cb_talk"], "check_callback_time"), vars=v)
     assert v["cb_state"] == "ok" and _route(n["cust_cb_talk"], v) == "cust_cb_book"
 
 
@@ -550,10 +550,10 @@ def test_model_argument_with_quotes_does_not_break_snippet(cat):
 
 
 def _offer(n, v, result, node="negotiate", amount="", date=""):
-    v["next_offer_args.result"] = result
-    v["next_offer_args.agreed_amount"] = amount
-    v["next_offer_args.agreed_date"] = date
-    run_snippet(_tool_code(n[node], "next_offer"), vars=v)
+    v["check_offer_answer_args.result"] = result
+    v["check_offer_answer_args.agreed_amount"] = amount
+    v["check_offer_answer_args.agreed_date"] = date
+    run_snippet(_tool_code(n[node], "check_offer_answer"), vars=v)
     route = _step(n, v, _route(n[node], v))
     if route == "commit_fix":
         run_snippet(_code_of(n["commit_fix"]), vars=v)
@@ -623,7 +623,7 @@ def test_one_day_for_all_products_keeps_each_deadline(cat, public_cases):
 
 
 def test_propose_results_keeps_offers_already_agreed(cat, public_cases):
-    """Bir ürün next_offer ile anlaşıldıktan sonra diğerinde dispute: model sadece dispute'u yazsa da önceki anlaşma
+    """Bir ürün check_offer_answer ile anlaşıldıktan sonra diğerinde dispute: model sadece dispute'u yazsa da önceki anlaşma
     kaybolmaz (eksik ürün hatası yok)."""
     n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
     v = {}
@@ -640,9 +640,9 @@ def test_offer_goes_straight_to_speech(cat, public_cases):
     n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
     v = {}
     _account(n, v, public_cases["PUB-12"], "spec_ab")
-    v.update({"next_offer_args.result": "refused", "next_offer_args.agreed_amount": "",
-              "next_offer_args.agreed_date": ""})
-    run_snippet(_tool_code(n["negotiate"], "next_offer"), vars=v)
+    v.update({"check_offer_answer_args.result": "refused", "check_offer_answer_args.agreed_amount": "",
+              "check_offer_answer_args.agreed_date": ""})
+    run_snippet(_tool_code(n["negotiate"], "check_offer_answer"), vars=v)
     assert _route(n["negotiate"], v) == "offer_step"
     run_snippet(_code_of(n["offer_step"]), vars=v)
     assert _route(n["offer_step"], v) == "negotiate_fix_say" and v["commit"] == ""
@@ -657,7 +657,7 @@ def test_readback_rejection_reopens_offers(cat, public_cases):
     plans = _account(n, v, public_cases["PUB-12"], "spec_ab")
     assert _offer(n, v, "agreed_all", amount="510", date="2026-10-15") == "readback"
     run_snippet(_code_of(n["readback_reset"]), vars=v)
-    assert "next_offer" in v["fix_prompt"]
+    assert "check_offer_answer" in v["fix_prompt"]
     assert _offer(n, v, "agreed", "negotiate_fix", str(plans[0]["past_due"]), "2026-10-15") == "negotiate_fix_say"
     assert v["commit_say"].startswith("Let us continue with your")
 
@@ -685,7 +685,7 @@ def test_hardship_without_spec_status_is_left_to_the_model(cat):
     s = spec("spec_a.json")
     s.negotiation.hardship_status = ""
     n = build_workflow(s, cat)["nodes"]
-    desc = [t for t in n["negotiate"]["tools"] if t["function"]["name"] == "next_offer"][0]
+    desc = [t for t in n["negotiate"]["tools"] if t["function"]["name"] == "check_offer_answer"][0]
     assert "hardship" not in json.dumps(desc["function"]["parameters"]["properties"]["result"])
     assert "result='hardship'" not in n["negotiate"]["task_message"]
 
@@ -699,7 +699,7 @@ def test_hardship_declined_after_model_offer_closes_without_repeat(cat, public_c
     assert (v["close_outcome"], v["close_reason"]) == ("no_promise", "hardship")
 
 
-def test_per_product_with_next_offer(cat, public_cases):
+def test_per_product_with_check_offer_answer(cat, public_cases):
     """Faz 3.1: per_product'ta kabul edilen ürün hemen okunur ve kaydedilir; kayıttan sonra 'kaydedildi' + sıradaki
     ürünün ilk teklifi; retler sonda not olarak (transfer yoksa)."""
     s = spec("spec_ab.json")
@@ -745,3 +745,215 @@ def test_per_product_last_product_agreed_after_refusals(cat, public_cases):
     v["rec_r_ok"] = "true"
     run_snippet(_code_of(n["rec_step"]), vars=v)
     assert v["next_step"] == "note"  # sıradaki ürün yok, notlara geçilir (negotiate_more döngüsü yok)
+
+
+def _negotiation_specs():
+    pp = spec("spec_ab.json")
+    pp.recording.mode = "per_product"
+    return [("spec_a", spec("spec_a.json"), "PUB-06"), ("spec_ab", spec("spec_ab.json"), "PUB-12"),
+            ("per_product", pp, "PUB-12")]
+
+
+@pytest.mark.parametrize("name,s,case", _negotiation_specs(), ids=lambda x: x if isinstance(x, str) else "")
+def test_every_model_tool_call_routes(name, s, case, cat, public_cases):
+    """Faz 3.5 ("no speakable content", 10 Eki 23:36): code_exec tool'unun sonucu modele boş döner. Tool çağrısından
+    sonra hiçbir geçiş tutmazsa model söyleyecek bir şey bulamaz ve çağrı takılır. Her cevap dizisinde (ret, çok
+    fazla, hardship, geçerli/floor altı/deadline sonrası kabul, dispute) her tool çağrısı bir geçişe gitmeli."""
+    import copy
+    n = build_workflow(s, cat)["nodes"]
+    v0 = {}
+    plans = _account(n, v0, public_cases[case], name)
+    full = str(plans[0]["past_due"])
+    actions = [("offer", "refused", "", ""), ("offer", "too_much", "", ""), ("offer", "hardship", "", ""),
+               ("offer", "agreed", full, "2026-10-16"), ("offer", "agreed", "1", "2026-10-16"),
+               ("offer", "agreed", full, "2027-03-01"),
+               ("propose", "; ".join(f"{p['product_id']}:dispute" for p in plans), "", ""),
+               ("propose", f"{plans[-1]['product_id']}:dispute", "", ""), ("propose", "p1:paid", "", ""),
+               ("both", "refused", "", f"{plans[-1]['product_id']}:dispute")]
+    talk = {k for k, x in n.items() if any(t["function"]["name"] == "check_offer_answer" for t in x.get("tools", []))}
+    frontier, calls = [("negotiate", v0, ())], 0
+    for _depth in range(3):
+        nxt = []
+        for node, v, path in frontier:
+            for act in actions:
+                w = copy.deepcopy(v)
+                if act[0] == "offer":
+                    w.update({"check_offer_answer_args.result": act[1], "check_offer_answer_args.agreed_amount": act[2],
+                              "check_offer_answer_args.agreed_date": act[3]})
+                    run_snippet(_tool_code(n[node], "check_offer_answer"), vars=w)
+                elif act[0] == "both":
+                    w.update({"check_offer_answer_args.result": act[1], "check_offer_answer_args.agreed_amount": "",
+                              "check_offer_answer_args.agreed_date": "", "propose_results_args.results": act[3]})
+                    run_snippet(_tool_code(n[node], "check_offer_answer"), vars=w)
+                    run_snippet(_tool_code(n[node], "propose_results"), vars=w)
+                else:
+                    w["propose_results_args.results"] = act[1]
+                    run_snippet(_tool_code(n[node], "propose_results"), vars=w)
+                calls += 1
+                route = _route(n[node], w)
+                assert route is not None, f"{name}: {node} {path + (act[1],)}: tool çağrısından sonra geçiş yok"
+                route = _step(n, w, route)
+                if route == "commit_fix":
+                    run_snippet(_code_of(n["commit_fix"]), vars=w)
+                    route = _route(n["commit_fix"], w)
+                assert route in n, f"{name}: {path + (act[1],)} → {route}"
+                if route in talk:
+                    # platform konuşma node'unun geçişlerini her müşteri turunda yeniden değerlendirir: eski bayrak
+                    # tetiklenirse node kendine döner (SC-03: negotiate_more go_more ile 70 tur)
+                    assert _route(n[route], w) is None, f"{name}: {path + (act[1],)}: {route} eski bayrakla döner"
+                    nxt.append((route, w, path + (act[1],)))
+        frontier = nxt
+    assert calls > 50
+
+
+@pytest.mark.parametrize("name,s,case", _negotiation_specs(), ids=lambda x: x if isinstance(x, str) else "")
+def test_every_code_node_has_service_failure_exit(name, s, case, cat):
+    """Faz 3.6: kod servisi bir code node'unu çalıştıramazsa değişkenler değişmez ve döngü sonsuza döner (10 Eki).
+    Her code node'unun İLK geçişleri `<node>_failure_count > 0` → yedek kapanış olmalı (offer_step, propose_step dahil)."""
+    wf = build_workflow(s, cat)
+    for k, x in wf["nodes"].items():
+        if x["node_type"] != "code":
+            continue
+        heads = [t for t in x["transitions"][:2] if f"{k}_failure_count" in json.dumps(t["condition"])]
+        assert heads, f"{k}: kod servisi hatası geçişi yok"
+        assert {t["target_node"] for t in heads} <= {"fallback_close", "fallback_close_nr"}
+        v = {f"{k}_failure_count": 1}
+        assert _route(x, v) == "fallback_close"
+        v["close_kind"] = "noreason"
+        assert _route(x, v) in ("fallback_close", "fallback_close_nr")
+    for k in ("offer_step", "propose_step"):
+        assert k in wf["nodes"]
+
+
+def _both_tools(n, v, node, offer_args, propose_raw, propose_first=False):
+    """Model aynı turda iki tool çağırır (SC-03, 11 Eki): ikisinin kodu art arda çalışır, sonra route edilir."""
+    def offer():
+        v.update({"check_offer_answer_args.result": offer_args[0], "check_offer_answer_args.agreed_amount": offer_args[1],
+                  "check_offer_answer_args.agreed_date": offer_args[2]})
+        run_snippet(_tool_code(n[node], "check_offer_answer"), vars=v)
+
+    def propose():
+        v["propose_results_args.results"] = propose_raw
+        run_snippet(_tool_code(n[node], "propose_results"), vars=v)
+    for f in ((propose, offer) if propose_first else (offer, propose)):
+        f()
+    route = _step(n, v, _route(n[node], v))
+    if route == "commit_fix":
+        run_snippet(_code_of(n["commit_fix"]), vars=v)
+        route = _route(n["commit_fix"], v)
+    return route
+
+
+def _drain_notes(n, v):
+    notes = []
+    while v.get("next_step") == "note":
+        notes.append((v["note_pid"], v.get("note_reason")))
+        v["note_r_ok"] = "true"
+        run_snippet(_code_of(n["note_step"]), vars=v)
+    return notes
+
+
+@pytest.mark.parametrize("propose_first", [False, True])
+def test_agree_one_and_dispute_another_in_one_turn_per_product(propose_first, cat, public_cases):
+    """SC-03 (canlı, 11 Eki): 'kredi kartını yarın öderim, krediyi ödemem, araç kredisi benim değil' → model aynı turda
+    check_offer_answer(agreed p1) + propose_results(p3:dispute). Eskiden ikinci tool bayrağı ezdi, p1 kayboldu ve
+    negotiate_more 'go_more' ile kendine döndü (70 tekrar). Şimdi: önce durum işlenir, sonra teklif cevabı; p3 teklif
+    sırasında atlanır."""
+    s = spec("spec_ab.json")
+    s.recording.mode = "per_product"
+    n = build_workflow(s, cat)["nodes"]
+    v = {}
+    p1, p2, p3 = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    route = _both_tools(n, v, "negotiate", ("agreed", str(p1["past_due"]), "2026-10-15"), "p3:dispute",
+                        propose_first)
+    assert route == "readback"
+    assert [q["product_id"] for q in json.loads(v["rec_queue"])] == ["p1"]
+    v["rec_r_ok"] = "true"
+    run_snippet(_code_of(n["rec_step"]), vars=v)
+    assert _route(n["rec_step"], v) == "negotiate_more"
+    assert _route(n["negotiate_more"], v) is None  # eski bayrak düz bir müşteri turunda tekrar tetiklenmez
+    assert p2["wording"] in v["progress_say"] and p3["wording"] not in v["progress_say"]
+    assert _offer(n, v, "refused", "negotiate_more") == "negotiate_fix_say"   # p2 2. deneme
+    assert p2["wording"] in v["commit_say"] or "p2" in v["commit_msg"]
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "record_note"       # p2 bitti, p3 zaten dispute
+    assert sorted(_drain_notes(n, v)) == [("p2", "refused"), ("p3", "dispute")]
+    assert v["close_outcome"] == "promise"
+
+
+@pytest.mark.parametrize("propose_first", [False, True])
+def test_agree_one_and_dispute_another_in_one_turn_batch(propose_first, cat, public_cases):
+    """Aynı tur, batch modu (Brief B): p1 kabulü kaybolmaz, p3 teklif sırasında atlanır, p2'ye teklif sürer; sonda
+    tek read-back (p1) ve notlar (p2 refused, p3 dispute)."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    p1, p2, p3 = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    route = _both_tools(n, v, "negotiate", ("agreed", str(p1["past_due"]), "2026-10-15"), "p3:dispute",
+                        propose_first)
+    assert route == "negotiate_fix_say" and p2["wording"] in v["commit_say"]
+    assert _route(n["negotiate_fix_say"], v) is None
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "negotiate_fix_say"  # p2 2. deneme
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "readback"
+    assert [q["product_id"] for q in json.loads(v["rec_queue"])] == ["p1"]
+    assert sorted(s["product_id"] + ":" + s["reason"] for s in json.loads(v["statuses_json"])) == \
+        ["p2:refused", "p3:dispute"]
+
+
+def test_status_for_current_product_moves_to_check_offer_answer(cat, public_cases):
+    """Teklif sürerken şu anki ürün için durum (ör. p1:paid): sıradaki açık ürünün 1. teklifi söylenir."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    p1, p2, p3 = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    assert _propose(n, v, "p1:paid") == "negotiate_fix_say"
+    assert p2["wording"] in v["commit_say"]
+    assert _route(n["negotiate_fix_say"], v) is None
+
+
+def test_callback_day_only(cat):
+    """SC-05 (11 Eki): müşteri saat vermeden gün söyler. Geçerli gün → sadece saat sorulur (tekrar sayılmaz);
+    geçersiz gün (Cumartesi) → kuralın tek 'başka zaman' sorusu; ikinci geçersiz cevap → vazgeç."""
+    n = build_workflow(spec("spec_a.json"), cat)["nodes"]
+    v = {"now": "2026-10-14T11:00"}
+    run_snippet(_code_of(n["third_party"]), vars=v)
+
+    def propose(date, time, node="third_party_talk"):
+        v.update({"check_callback_time_args.date": date, "check_callback_time_args.time": time})
+        run_snippet(_tool_code(n[node], "check_callback_time"), vars=v)
+        route = _route(n[node], v)
+        if route == "third_party_fix":
+            run_snippet(_code_of(n["third_party_fix"]), vars=v)
+        return route
+
+    assert propose("2026-10-15", "") == "third_party_fix" and v["cb_bad"] == "0"
+    assert v["cb_say"] == "What time on that day would suit you?"
+    assert n["third_party_retry"]["on_enter"] == {"type": "tts", "text": "{{cb_say}}"}
+    assert propose("2026-10-17", "", "third_party_retry") == "third_party_fix" and v["cb_bad"] == "1"  # Cumartesi
+    assert v["cb_say"].startswith("I am sorry, I cannot book that time.") and "outside the allowed days" in v["cb_msg"]
+    assert "between 10:00 and 19:00" in v["cb_say"] and "scheduled" not in v["cb_say"]
+    assert propose("2026-10-19", "20:00", "third_party_retry") == "close_no_callback"
+
+
+def test_customer_callback_no_callback_outcome(cat):
+    """Brief'in müşteri için ayrı bir 'geçerli zaman yok' kapanışı varsa: tekrar sonrası o outcome'la kapanır."""
+    from fbb.spec import OutcomeRef
+    s = spec("spec_a.json")
+    s.customer_callback.enabled = True
+    s.customer_callback.trigger = "The customer says they cannot talk now and asks to be called later."
+    s.customer_callback.outcome = OutcomeRef(outcome="no_promise", reason="hardship")
+    s.customer_callback.no_callback_outcome = OutcomeRef(outcome="no_promise", reason="dispute")
+    wf = build_workflow(s, cat)
+    assert _lint(wf, s, cat) == []
+    n = wf["nodes"]
+    assert "close_cust_no_callback" in n
+    body = _body(n["close_cust_no_callback"])
+    assert body["outcome"]["default"] == "no_promise" and body["reason"]["default"] == "dispute"
+    assert any(t["target_node"] == "close_cust_no_callback" for t in n["cust_cb_talk"]["transitions"])
+    assert "transition_to_close_cust_no_callback" in n["cust_cb_talk"]["task_message"]
+    v = {"now": "2026-10-14T11:00"}
+    run_snippet(_code_of(n["cust_cb"]), vars=v)
+    for node, date in (("cust_cb_talk", "2026-10-17"), ("cust_cb_retry", "2026-10-18")):
+        v.update({"check_callback_time_args.date": date, "check_callback_time_args.time": "10:00"})
+        run_snippet(_tool_code(n[node], "check_callback_time"), vars=v)
+        route = _route(n[node], v)
+        if route == "cust_cb_fix":
+            run_snippet(_code_of(n["cust_cb_fix"]), vars=v)
+    assert route == "close_cust_no_callback"

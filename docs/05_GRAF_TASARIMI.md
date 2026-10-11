@@ -10,7 +10,7 @@ Kod: `src/fbb/workflow/graph.py`. Brief A, tek ürünlü ve notları kapalı bir
   uydurmaz, ürün değiştirmez, "bugün"ü tekrar sormaz. Bütün ürünler bitince sonuç kendiliğinden propose_step'e gider
 - `propose_results(results)`: müzakerenin sonucu (ret dışı durumlar ve transferler için); kod doğrular, düzeltir ve
   read-back cümlesini kendisi üretir
-- `propose_callback(date, time)`: geri arama zamanı (üçüncü kişi ya da, brief isterse, müşterinin kendisi)
+- `check_callback_time(date, time)`: geri arama zamanı (üçüncü kişi ya da, brief isterse, müşterinin kendisi)
 
 Bunlar bankaya hiçbir şey yazmaz, sadece doğrulayıp bayrak koyar. Bankaya yazan bütün çağrıları engine yapar
 (api_request node'ları). Route'lar string bayraklara ya da cevap alanlarına (`"true"`/`"True"` OR) bakar.
@@ -29,7 +29,7 @@ opener (tts açılış + onay sorusu; tool-call transition'lar)
  │         gerisi (yanlış, gün/ay ipucu, okunamadı, 500) → id_fix (code) → reask (tts {{id_say}})
  │     id_decl=explain → id_fix (açıklama + soru) → reask      id_decl=close → close_id_declined
  │     id_go=fail (aşırı deneme emniyeti) → close_id_failed
- ├─ third_party (code: erken outcome no_callback + prep_callback) → third_party_talk (propose_callback)
+ ├─ third_party (code: erken outcome no_callback + prep_callback) → third_party_talk (check_callback_time)
  │     cb_state=ok → third_party_book (api) → ok: close_callback / hata: close_no_callback
  │     cb_state=invalid → third_party_fix → third_party_retry      cb_state=gave_up → close_no_callback
  ├─ close_wrong_number / close_deceased / close_unclear / close_id_declined / transfer_<id> / cust_cb
@@ -91,7 +91,7 @@ kod servisi hatası (her code node'unun guard'ı): fallback_close[_nr] (o ana ka
 | Vaka | Yol | Beklenen ledger |
 |---|---|---|
 | PUB-01 | opener → ask_q0 → verify_q0 → ask_q1 → verify_q1 → negotiate (bugün, tam tutar) → propose `p1:X:bugün` → readback → evet → kayıt → send_close_nr | promise |
-| PUB-02 | opener → third_party → propose_callback(yarın 11:00) → book → close_callback | not_reached/callback, verify yok |
+| PUB-02 | opener → third_party → check_callback_time(yarın 11:00) → book → close_callback | not_reached/callback, verify yok |
 | PUB-03 | kimlik: yanlış → id_fix → reask … `wrong_answers_left=0` → close_id_failed ("app or branch") | not_verified/failed |
 | PUB-04 | 6 Kasım > deadline → model deadline'ı önerir ya da kod read-back'te 23 Eki'ye çeker → kabul | promise 23 Eki |
 | PUB-05 | iş kaybı → sempati + destek teklifi → ret → `p1:hardship` | no_promise/hardship |

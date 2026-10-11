@@ -162,7 +162,7 @@ def negotiate_task(spec: PolicySpec) -> str:
         "- Never propose an amount or a date yourself, never ask again whether they can pay today, never repeat a "
         "proposal, and never move on to another product yourself. The first question about paying today counts as "
         "the first ask for every product" + (" at once." if mp.enabled else ".")
-        + " Every time the customer answers about the current product, call next_offer: result='refused' for a flat "
+        + " Every time the customer answers about the current product, call check_offer_answer: result='refused' for a flat "
         "no or no answer, 'too_much' when they say the amount is too high, 'agreed' with agreed_amount and "
         "agreed_date when they name or accept an amount and a day (look the day up in the calendar)"
         + (", 'agreed_all' with agreed_date when they name ONE day for this and every later product (pass the day "
@@ -172,10 +172,10 @@ def negotiate_task(spec: PolicySpec) -> str:
         "first.",
         ("- Hardship (" + next((st.trigger for st in spec.statuses if st.id == n.hardship_status), "")
          + "): follow the rules above ONCE (one sentence of sympathy and the offer). If they accept, transfer. If "
-         "they decline, never offer it again: call next_offer with result='hardship' at once."
+         "they decline, never offer it again: call check_offer_answer with result='hardship' at once."
          if n.hardship_status else ""),
         "- Statuses other than a refusal (" + ", ".join(st.id for st in spec.statuses if not st.persuade)
-        + ") and transfers are not next_offer answers: handle them under the rules and call propose_results with "
+        + ") and transfers are not check_offer_answer answers: handle them under the rules and call propose_results with "
         "every product.",
         "- If the customer asks a question about the proposal, answer it and ask only whether that works.",
         "- If the customer names their own amount or date, that is not a refusal: settle it under the rules above "
@@ -192,7 +192,7 @@ def negotiate_task(spec: PolicySpec) -> str:
         (f"- {cc.trigger} → call transition_to_cust_cb." if cc.enabled and "post_verify" in cc.stages else ""),
         "",
         "FINISHING THIS STEP (very important, this overrides any rule above about reading back or confirming):",
-        ("When every product is settled through next_offer, the system reads the promises back by itself. Call "
+        ("When every product is settled through check_offer_answer, the system reads the promises back by itself. Call "
          "propose_results yourself only when a product ends with a status other than a refusal or a transfer is "
          "needed: "
          + ("with that product only; the system reads it back, records it after the customer confirms, and then you "
@@ -236,8 +236,9 @@ def third_party_task(spec: PolicySpec) -> str:
         bullets(tp.rules),
         f'Ask when the customer can be reached: "{tp.ask_reachability}"',
         "{{cb_facts}}",
-        "When the person names a day and a time, turn them into YYYY-MM-DD and HH:MM (24-hour clock) and call "
-        "propose_callback. Do not decide yourself whether the time is allowed: the system checks it.",
+        "When the person names a day (with or without a time), turn it into YYYY-MM-DD and HH:MM (24-hour clock; "
+        "time '' if they named only a day) and call check_callback_time at once. Do not decide yourself whether the day "
+        "or the time is allowed and do not ask for a time before the system has checked the day: it checks both.",
         "If the person says the number does not belong to the customer, call transition_to_close_wrong_number. "
         "If they say the customer has died, call transition_to_close_deceased. If they will not give any time, "
         "call transition_to_close_no_callback.",
@@ -246,14 +247,15 @@ def third_party_task(spec: PolicySpec) -> str:
     ]).strip()
 
 
-def customer_callback_task(spec: PolicySpec) -> str:
+def customer_callback_task(spec: PolicySpec, gave_up: str = "close_final") -> str:
     cc = spec.customer_callback
     return "\n".join([
         "The customer wants to be called back later.",
         f'Ask when they can be called: "{cc.ask}"' if cc.ask else "Ask when they can be called back.",
         "{{cb_facts}}",
-        "When the customer names a day and a time, turn them into YYYY-MM-DD and HH:MM (24-hour clock) and call "
-        "propose_callback. Do not decide yourself whether the time is allowed: the system checks it.",
-        "If they will not give any time, call transition_to_close_final.",
+        "When the customer names a day (with or without a time), turn it into YYYY-MM-DD and HH:MM (24-hour clock; "
+        "time '' if they named only a day) and call check_callback_time at once. Do not decide yourself whether the day "
+        "or the time is allowed and do not ask for a time before the system has checked the day: it checks both.",
+        f"If they will not give any time, call transition_to_{gave_up}.",
         "Last check result: {{cb_msg}}",
     ]).strip()

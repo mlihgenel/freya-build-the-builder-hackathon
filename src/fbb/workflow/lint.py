@@ -155,7 +155,8 @@ def lint(workflow: dict, cat: ToolCatalog, *, call_vars: list[str], forbidden_pr
             for req in (r for r, fd in tool.fields.items() if fd.required):
                 if req not in body:
                     warns.append(f"{name}: {tool.name} zorunlu alanı eksik: {req} (spec.tool_constants ile doldurulabilir)")
+    # boyut build'i durdurmaz: platformun dryRun'ı 1,2 MB'ı kabul etti (11 Eki); asıl kontrol deploy öncesi dryRun
     size = len(json.dumps(workflow))
     if size > 400_000:
-        errs.append(f"workflow çok büyük: {size} bayt")
+        warns.append(f"workflow büyük: {size} bayt (dryRun 1,2 MB'a kadar kabul etti; kayıt ve gecikmeye dikkat)")
     return errs

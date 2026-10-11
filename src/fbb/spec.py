@@ -202,7 +202,9 @@ class Transfer(Strict):
     trigger: str = Field(..., description="Ne zaman: müşterinin ne söylediği")
     say: str = Field("", description="Transferden önce söylenecek cümle")
     ask_first: str = Field("", description="Önce bir kez sorulacak soru (ör. insan talebinde 'yardımcı olabilir miyim')")
-    stages: list[Literal["pre_identity", "post_verify"]] = Field(default_factory=lambda: ["post_verify"])
+    stages: list[Literal["pre_identity", "post_verify"]] = Field(
+        default_factory=lambda: ["post_verify"],
+        description="İnsan isteği, brief kısıtlamadıkça iki aşamada da; borçla ilgili transferler sadece post_verify")
 
 
 class Status(Strict):
@@ -238,6 +240,8 @@ class CustomerCallback(Strict):
     trigger: str = Field("", description="Müşteri ne derse geri arama teklif edilir (ör. 'şu an konuşamam')")
     ask: str = Field("", description="Müşteriye ne zaman aranmak istediğini soran cümle")
     outcome: OutcomeRef = Field(default_factory=lambda: OutcomeRef(outcome="", reason=""))
+    no_callback_outcome: OutcomeRef | None = Field(
+        None, description="Geçerli bir zaman verilmezse (tekrar sonrası) brief'in istediği kapanış; boşsa genel kapanış")
     stages: list[Literal["pre_identity", "post_verify"]] = Field(default_factory=lambda: ["post_verify"])
     window: Callback | None = Field(None, description="Boşsa third_party.callback penceresi kullanılır")
 
@@ -457,6 +461,8 @@ def cross_check(spec: PolicySpec, cat: ToolCatalog) -> list[str]:
             spec.third_party.deceased_outcome.outcome]
     if spec.customer_callback.enabled:
         outs.append(spec.customer_callback.outcome.outcome)
+        if spec.customer_callback.no_callback_outcome:
+            outs.append(spec.customer_callback.no_callback_outcome.outcome)
     for o in outs:
         need("close_call", spec.tool_fields.get("close_call", {}).get("outcome", "outcome"), o, "outcome")
     for ptype in spec.disclosure.product_wording:

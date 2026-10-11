@@ -1,7 +1,7 @@
 """PolicySpec + ToolCatalog → Freya workflow (docs/05_GRAF_TASARIMI.md).
 
 İlke: model sadece konuşur ve az sayıda şeyi bildirir (submit_answer, decline_questions, propose_results,
-propose_callback). Bankaya yazan her çağrıyı engine yapar (api_request node'ları). Kararlar ya code node'larında
+check_callback_time). Bankaya yazan her çağrıyı engine yapar (api_request node'ları). Kararlar ya code node'larında
 ya da doğrudan cevap değişkenleri üzerinden route'larda verilir. Aynı spec her zaman aynı workflow'u üretir.
 
 Gecikme: her code node'u yük altında 2-8 sn sürüyor. Bu yüzden code node'u sadece gerçekten hesap gereken yerde
@@ -242,10 +242,13 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
         "or <product_id>:<status>, entries separated by ';'. The system checks it and reads it back to the customer.",
         {"results": "One entry per product separated by ';', e.g. 'p1:250.50:2026-10-16; p2:refused'."},
         # Tool sadece argümanı kaydeder; doğrulama tek bir propose_step node'unda (boyut: neg node'ları küçük kalır).
+        # aynı turda check_offer_answer da çağrılabilir: ikisi de bekleyen olarak işaretlenir, önce durumlar işlenir
         "vars['propose_args'] = tool_arg(vars, 'propose_results', 'results', ARG_results)\n"
-        "vars['commit'] = 'propose_in'", rt)
+        "vars['propose_pending'] = '1'\nvars['commit'] = 'propose_in'", rt)
+    # ad "check": hakem next_offer(result='agreed') çağrısını 'promise kaydedildi' saydı (SC-01, 11 Eki); kayıt yalnız
+    # read-back onayından sonra create_promise ile olur
     offer = model_tool(
-        "next_offer",
+        "check_offer_answer",
         "CALL it, instead of speaking, every time the customer answers about the CURRENT product (the one the system "
         "proposed last; at the start the first product): a flat refusal or no answer, 'the amount is too much', or "
         "an agreed amount and date. A question or a vague reply ('you tell me', 'I don't know', 'what can I do?') is "
@@ -265,9 +268,10 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
          "agreed_date": "Only for 'agreed' and 'agreed_all': the date the customer named as YYYY-MM-DD (from the "
                         "calendar), exactly as named. Otherwise ''."},
         # Tool sadece argümanları kaydeder; iş tek bir offer_step node'unda (her neg node'una gömülen kod küçük kalır).
-        "vars['offer_args'] = json.dumps([tool_arg(vars, 'next_offer', 'result', ARG_result), "
-        "tool_arg(vars, 'next_offer', 'agreed_amount', ARG_agreed_amount), "
-        "tool_arg(vars, 'next_offer', 'agreed_date', ARG_agreed_date)])\nvars['commit'] = 'offer_in'", rt)
+        "vars['offer_args'] = json.dumps([tool_arg(vars, 'check_offer_answer', 'result', ARG_result), "
+        "tool_arg(vars, 'check_offer_answer', 'agreed_amount', ARG_agreed_amount), "
+        "tool_arg(vars, 'check_offer_answer', 'agreed_date', ARG_agreed_date)])\nvars['offer_pending'] = '1'\n"
+        "vars['commit'] = 'propose_in' if vars.get('propose_pending') == '1' else 'offer_in'", rt)
     per_product = spec.recording.mode == "per_product"
     loop = [when_eq("record_promise", "a promise to record", "next_step", "record")]
     if per_product:
@@ -280,7 +284,6 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
         when_eq("propose_step", "results proposed", "commit", "propose_in"),
         when_eq("readback", "results accepted, read them back", "commit", "confirm"),
         when_eq("record_note", "only statuses: notes", "commit", "go_note"),
-        *([when_eq("negotiate_more", "only statuses: next product", "commit", "go_more")] if per_product else []),
         when_eq(SEND, "only statuses: close", "commit", "go_end_r"),
         when_eq(SEND_NR, "only statuses: close", "commit", "go_end_nr"),
         when_eq("commit_fix", "results not accepted", "commit", "invalid", "invalid_say"),
@@ -292,15 +295,21 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
                             transitions=neg_transitions, max_turns=60, max_turn_target="close_final")
 
     nodes["negotiate"] = neg_node("negotiate", {"type": "tts", "text": "{{debt_statement}} {{first_ask}}"}, True)
+    # go_more sadece kod adımından çıkar: konuşma node'unda (negotiate_more → negotiate_more) temizlenmemiş bayrak her
+    # müşteri turunda tekrar tetikleniyordu (SC-03, 11 Eki: aynı cümle 70 kez)
     step_routes = [t for t in neg_transitions if t["target_node"] not in ("offer_step", "propose_step")
                    and not t.get("is_tool_call")]
-    nodes["offer_step"] = code("offer_step", snip("next_offer(vars, RT, *json.loads(vars.get('offer_args') or '[]'))",
+    if per_product:
+        step_routes.append(when_eq("negotiate_more", "only statuses: next product", "commit", "go_more"))
+    nodes["offer_step"] = code("offer_step", snip("check_offer_answer(vars, RT, *json.loads(vars.get('offer_args') or '[]'))",
                                                   "vars['commit'] = 'invalid'"),
                                [when_eq("negotiate_fix_say", "say the next proposal", "offer_go", "say"),
                                 when_eq("propose_step", "every product settled", "commit", "propose_in")] + step_routes,
                                "commit_fix")
-    nodes["propose_step"] = code("propose_step", snip("propose_results(vars, RT, vars.get('propose_args', ''))",
-                                                      "vars['commit'] = 'invalid'"), step_routes, "commit_fix")
+    nodes["propose_step"] = code("propose_step", snip("propose_step(vars, RT)", "vars['commit'] = 'invalid'"),
+                                 [when_eq("negotiate_fix_say", "say the next proposal", "offer_go", "say"),
+                                  when_eq("offer_step", "the answer about the current product, same turn", "commit",
+                                          "offer_in")] + step_routes, "commit_fix")
     nodes["commit_fix"] = code("commit_fix", snip("commit_reset(vars)"),
                                [when_eq("negotiate_fix_say", "tell the customer", "fix_kind", "say")], "negotiate_fix")
     nodes["negotiate_fix"] = neg_node("negotiate_fix", {"type": "llm", "prompt": "{{fix_prompt}}"})
@@ -351,11 +360,13 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
     # --- geri arama (üçüncü kişi ve, brief isterse, müşterinin kendisi) ----------------------------------
     tp = spec.third_party
     propose_cb = model_tool(
-        "propose_callback",
-        "CALL it when the person names a day and a time for the callback. The system checks the time.",
-        {"date": "The day as YYYY-MM-DD.", "time": "The time as HH:MM, 24-hour clock."},
-        "take_callback(vars, RT, tool_arg(vars, 'propose_callback', 'date', ARG_date), "
-        "tool_arg(vars, 'propose_callback', 'time', ARG_time))", rt)
+        # ad "check": hakem "propose/schedule" adlı bir tool çağrısını kurulmuş callback sanıyordu (SC-05, 11 Eki)
+        "check_callback_time",
+        "CALL it when the person names a day for the callback, with the time if they gave one. The system checks "
+        "the day and the time.",
+        {"date": "The day as YYYY-MM-DD.", "time": "The time as HH:MM, 24-hour clock; '' if they named only a day."},
+        "take_callback(vars, RT, tool_arg(vars, 'check_callback_time', 'date', ARG_date), "
+        "tool_arg(vars, 'check_callback_time', 'time', ARG_time))", rt)
     cb_ok_path = ok_path(spec, cat, "schedule_callback")
 
     def callback_flow(prefix: str, kind: str, task: str, first_prompt: str, done: str, gave_up: str,
@@ -363,17 +374,21 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
         nodes[prefix] = code(prefix, snip((early + "\n" if early else "") + f"prep_callback(vars, RT, {kind!r})\n"
                                           "vars['cb_msg'] = ''\nvars['cb_state'] = ''\nvars['cb_bad'] = '0'"), [],
                              f"{prefix}_talk")
+        # müşteri zamanı geçişi tetikleyen mesajda zaten söylediyse tekrar sorulmaz (SC-04/05: hakem "iki kez sordu")
+        first_prompt = ("If their last message already said when to call (a day or a time), do not ask again: repeat "
+                        "that day and time back in one short question, e.g. 'Monday at 8 pm, is that right?'. "
+                        "Otherwise: " + first_prompt)
         trans = [when_eq(f"{prefix}_book", "callback time accepted", "cb_state", "ok"),
                  when_eq(gave_up, "no valid callback time", "cb_state", "gave_up"),
-                 when_eq(f"{prefix}_fix", "callback time rejected", "cb_state", "invalid")] + extra
+                 when_eq(f"{prefix}_fix", "callback time rejected or missing", "cb_state", "invalid",
+                         "need_time")] + extra
         nodes[f"{prefix}_talk"] = conversation(
             f"{prefix}_talk", task, on_enter={"type": "llm", "prompt": first_prompt}, tools=[propose_cb],
             transitions=trans, max_turns=12, max_turn_target=gave_up)
         nodes[f"{prefix}_fix"] = code(f"{prefix}_fix", snip("vars['cb_state'] = ''"), [], f"{prefix}_retry")
         nodes[f"{prefix}_retry"] = conversation(
             f"{prefix}_retry", task,
-            on_enter={"type": "llm", "prompt": "That time cannot be booked ({{cb_msg}}). Ask once for another day and "
-                                               "time inside the allowed window."},
+            on_enter={"type": "tts", "text": "{{cb_say}}"},
             tools=[propose_cb], transitions=trans, max_turns=8, max_turn_target=gave_up)
         cb_call = call("schedule_callback", {"customer_id": cid, "date": "{{cb_date}}", "time": "{{cb_time}}"},
                        retries=1)
@@ -389,12 +404,16 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
          tool_transition("close_no_callback", "The person will not give any time to reach the customer.")],
         f"set_close_default(vars, RT, {nb.outcome!r}, {nb.reason!r})")
     if cc.enabled:
-        callback_flow("cust_cb", "customer", texts.customer_callback_task(spec),
+        gave_up = "close_cust_no_callback" if cc.no_callback_outcome else "close_final"
+        callback_flow("cust_cb", "customer", texts.customer_callback_task(spec, gave_up),
                       f'Ask: "{cc.ask}"' if cc.ask else "Ask when they can be called back.",
-                      "close_cust_callback", "close_final",
-                      [tool_transition("close_final", "The customer will not give any time for a callback.")], "")
+                      "close_cust_callback", gave_up,
+                      [tool_transition(gave_up, "The customer will not give any time for a callback.")], "")
         nodes["close_cust_callback"] = static_close("close_cust_callback", cc.outcome.outcome, cc.outcome.reason,
                                                     "", False)
+        if cc.no_callback_outcome:
+            nodes[gave_up] = static_close(gave_up, cc.no_callback_outcome.outcome, cc.no_callback_outcome.reason,
+                                          "", False)
 
     # --- sabit kapanışlar (kodsuz) ---------------------------------------------------------------------
     # müşteri olduğu doğrulanmamış kişiye müşterinin adıyla veda edilmez
