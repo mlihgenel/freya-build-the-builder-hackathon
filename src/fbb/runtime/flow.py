@@ -460,6 +460,7 @@ def take_callback(vars, RT, date_text, time_text):
     if ok:
         vars["cb_date"] = to_date(date_text).isoformat()
         vars["cb_time"] = str(time_text).strip()[:5].rjust(5, "0")
+        vars["cb_at"] = vars["cb_date"] + "T" + vars["cb_time"]
         vars["cb_state"] = "ok"
         return
     if not re.match(r"^\s*\d{1,2}:\d{2}", str(time_text or "")):

@@ -519,8 +519,20 @@ def cross_check(spec: PolicySpec, cat: ToolCatalog) -> list[str]:
         outs.append(spec.customer_callback.outcome.outcome)
         if spec.customer_callback.no_callback_outcome:
             outs.append(spec.customer_callback.no_callback_outcome.outcome)
+    out_field = spec.tool_fields.get("close_call", {}).get("outcome", "outcome")
     for o in outs:
-        need("close_call", spec.tool_fields.get("close_call", {}).get("outcome", "outcome"), o, "outcome")
+        need("close_call", out_field, o, "outcome")
+    close_fields = cat.tools["close_call"].fields if cat.has("close_call") else {}
+    reason_field = spec.tool_fields.get("close_call", {}).get("reason", "reason")
+    if close_fields and reason_field not in close_fields:
+        # tek sonuç kodu: her kuyruğun ve her ürün durumunun kodu outcome enum'unda olmalı
+        for t in spec.transfers:
+            need("close_call", out_field, c.transfer_reasons.get(t.queue, t.queue),
+                 f"tek kodlu close_call: closing.transfer_reasons['{t.queue}']")
+        for sid in [s.id for s in spec.statuses] + [spec.recording.failure_status]:
+            if sid != c.paid_status:
+                need("close_call", out_field, c.status_to_reason.get(sid, sid),
+                     f"tek kodlu close_call: closing.status_to_reason['{sid}']")
     for ptype in spec.disclosure.product_wording:
         need("get_account", f"{rf.products}[].{rf.product_type}", ptype, "ürün tipi")
     items = _item_props(cat, rf.products)

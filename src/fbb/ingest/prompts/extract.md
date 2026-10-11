@@ -35,6 +35,9 @@ How the program uses the spec:
   If the brief gives a reason code for the promise outcome or the already-paid outcome, put it in
   `closing.promise_reason` / `closing.paid_reason`; if the promise reason depends on whether every recorded amount is
   the full amount, the full-amount code goes in `promise_reason` and the partial one in `promise_reason_partial`.
+  If `close_call` takes ONE code and no separate reason, put the code for each transfer queue in
+  `transfer_reasons` (queue → code) and the code for each product status in `status_to_reason` (status → code); the
+  system then sends that code as the outcome.
 - `transfers`: one entry per situation that hands the call to a person (queue must be a value of the transfer tool).
   `stages`: a request to speak to a person/human is accepted both before identity (`pre_identity`) and after it
   (`post_verify`) unless the brief limits it, because handing the call to a colleague reveals nothing about the

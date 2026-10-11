@@ -1171,7 +1171,7 @@ def test_promise_and_paid_reasons(cat, public_cases):
     assert _close_of(base, v2) == ("promise", "", "noreason")
 
 
-@pytest.mark.parametrize("k", ["c", "d", "e", "f"])
+@pytest.mark.parametrize("k", ["c", "d", "e", "f", "g"])
 def test_rehearsal_briefs_build_cleanly(k):
     """Prova brief'leri (C/D/E/F, tests/fixtures/variants): beklenen spec + kendi openapi'si → cross_check boş, lint 0."""
     from fbb.spec import resolve_request_fields
@@ -1182,3 +1182,28 @@ def test_rehearsal_briefs_build_cleanly(k):
     assert cross_check(s, vcat) == []
     wf = build_workflow(s, vcat)
     assert _lint(wf, s, vcat) == []
+
+
+def test_single_result_code_close_and_datetime_callback(public_cases):
+    """Brief G (11 Eki): close_call tek 'result_code' alır → durumun/kuyruğun kodu outcome olur (hardship →
+    NO_PROMISE_HARDSHIP); schedule_callback tek 'callback_at' alır → 'YYYY-MM-DDTHH:MM'."""
+    from fbb.spec import resolve_request_fields
+    vcat = load_catalog(FIX / "variants" / "openapi_g.json")
+    s = PolicySpec.model_validate(json.loads((FIX / "variants" / "spec_g_expected.json").read_text()))
+    resolve_response_fields(s, vcat)
+    resolve_request_fields(s, vcat)
+    n = build_workflow(s, vcat)["nodes"]
+    assert _body(n["third_party_book"])["callback_at"]["default"] == "{{cb_at}}"
+    assert _body(n["close_transfer_hardship_care"])["result_code"]["default"] == "TRANSFERRED_CARE"
+    assert "reason" not in _body(n["send_close"])
+    v = {"now": "2026-10-14T11:00"}
+    run_snippet(_code_of(n["third_party"]), vars=v)
+    v.update({"check_callback_time_args.date": "2026-10-15", "check_callback_time_args.time": "15:00"})
+    run_snippet(_tool_code(n["third_party_talk"], "check_callback_time"), vars=v)
+    assert v["cb_state"] == "ok" and v["cb_at"] == "2026-10-15T15:00"
+    w = {"id_state": "verified", "statuses_json": json.dumps([{"product_id": "p1", "reason": "hardship"}])}
+    run_snippet(_code_of(n["close_final"]), vars=w)
+    assert (w["close_outcome"], w["close_reason"], w["close_kind"]) == ("NO_PROMISE_HARDSHIP", "", "noreason")
+    w = {"id_state": "verified", "statuses_json": json.dumps([{"product_id": "p1", "reason": "paid"}])}
+    run_snippet(_code_of(n["close_final"]), vars=w)
+    assert w["close_outcome"] == "PAID"

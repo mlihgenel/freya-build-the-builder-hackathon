@@ -54,6 +54,8 @@ def canonical(spec: dict) -> dict:
     s["bands"] = sorted(s.get("bands") or [], key=lambda b: (b.get("min", 0), b.get("max", 0)))
     for b in s["bands"]:
         b.pop("name", None)  # bant adı spec içinde tutarlı olduğu sürece önemsiz
+        if b.get("deadline_rule"):
+            b.pop("deadline_bd", None)  # kural varken deadline_bd okunmaz (dates.deadline_for)
     cal = s.get("calendar") or {}
     cal["holidays"] = sorted(set(cal.get("holidays") or []))
     s["statuses"] = {st["id"]: {"persuade": st.get("persuade", False)} for st in s.get("statuses") or []}

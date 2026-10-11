@@ -43,7 +43,15 @@ def promise_reason(vars, c):
 
 
 def decide_close(vars, RT):
-    """Dönüş: (outcome, reason). reason '' ise close_call'a hiç gönderilmez."""
+    """Dönüş: (outcome, reason). reason '' ise close_call'a hiç gönderilmez. Tek sonuç kodlu close_call'da
+    (reason alanı yok) durumun/kuyruğun kodu outcome olarak döner."""
+    o, r = decide_close_pair(vars, RT)
+    if RT["closing"].get("single_code") and r:
+        return r, ""
+    return o, r
+
+
+def decide_close_pair(vars, RT):
     c = RT["closing"]
     queue = transfer_queue_of(vars, RT)
     if queue:

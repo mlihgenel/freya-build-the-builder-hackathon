@@ -77,6 +77,21 @@ def body_for(spec: PolicySpec, cat: ToolCatalog, tool: str, values: dict[str, st
     return body
 
 
+def callback_body(spec: PolicySpec, cat: ToolCatalog, cid: str) -> dict[str, str]:
+    """schedule_callback gövdesi. Tarih ayrı bir alana eşlenemiyorsa (ör. tek 'callback_at' alanı) tarih ve saat tek
+    alanda 'YYYY-MM-DDTHH:MM' olarak gider: saatin eşlendiği alan ya da biçimi/açıklaması tarih-saat olan alan."""
+    body = body_for(spec, cat, "schedule_callback", {"customer_id": cid, "date": "{{cb_date}}", "time": "{{cb_time}}"})
+    if "{{cb_date}}" in body.values():
+        return body
+    fields = cat.tools["schedule_callback"].fields
+    target = next((k for k, v in body.items() if v == "{{cb_time}}"), "") or next(
+        (k for k, f in fields.items() if k not in body and (f.format == "date-time" or re.search(
+            r"date.?time|YYYY-MM-DD.?T|_at$", k + " " + (f.description or ""), re.I))), "")
+    if target:
+        body[target] = "{{cb_at}}"
+    return body
+
+
 def ok_path(spec: PolicySpec, cat: ToolCatalog, tool: str) -> str:
     """Yazma çağrısının başarı alanı: cevap şemasında ok alanı varsa o, yoksa zarfın status'u ('success')."""
     resp = cat.tools[tool].response if cat.has(tool) else {}
@@ -92,6 +107,10 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
     rt = to_runtime(spec)
     close_body_names = field_map(spec, cat, "close_call", {"outcome": "o", "reason": "r"})
     rt["close_fields"] = {("outcome" if v == "o" else "reason"): k for k, v in close_body_names.items()}
+    # close_call'da reason alanı yoksa (tek sonuç kodu): durumun/kuyruğun kodu outcome olarak gider
+    single_code = "reason" not in rt["close_fields"]
+    if single_code:
+        rt["closing"]["single_code"] = True
     cid = "{{" + spec.call_variables.customer_id + "}}"
     o = spec.opening
     i = spec.identity
@@ -111,6 +130,8 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
     no_reason = set(spec.closing.no_reason_outcomes)
 
     def close_call(outcome: str, reason: str) -> dict:
+        if single_code and reason:
+            outcome, reason = reason, ""
         values = {"customer_id": cid, "outcome": outcome}
         if reason and outcome not in no_reason:
             values["reason"] = reason
@@ -390,8 +411,7 @@ def build_workflow(spec: PolicySpec, cat: ToolCatalog) -> dict:
             f"{prefix}_retry", task,
             on_enter={"type": "tts", "text": "{{cb_say}}"},
             tools=[propose_cb], transitions=trans, max_turns=8, max_turn_target=gave_up)
-        cb_call = call("schedule_callback", {"customer_id": cid, "date": "{{cb_date}}", "time": "{{cb_time}}"},
-                       retries=1)
+        cb_call = bank_call(cat, "schedule_callback", callback_body(spec, cat, cid), retries=1)
         nodes[f"{prefix}_book"] = api_request(f"{prefix}_book", cb_call, [(cb_ok_path, "cb_r_ok")], gave_up,
                                               [when_eq(done, "callback booked", "cb_r_ok", *OK)])
 
