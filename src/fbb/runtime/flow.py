@@ -195,7 +195,8 @@ def fold_statuses(vars, RT, raw):
     cur = int(state.get("cur", 0))
     entries = parse_results(raw)
     ids = [p["product_id"] for p in plans]
-    settled = settled_ids(vars)
+    # kesinleşmiş ürünler yalnız per_product'ta: batch'te statuses_json read-back'e kadar geçicidir (ret → geri alınır)
+    settled = settled_ids(vars) if (RT.get("recording") or dict()).get("mode") == "per_product" else []
     done = [r.split(":", 1)[0] for r in state.get("results") or []] + settled
     reasons = RT.get("status_reasons", [])
     cur = next_open(state, plans, cur, settled)
@@ -206,6 +207,8 @@ def fold_statuses(vars, RT, raw):
             or len(set(listed)) != len(listed):
         return False
     old = ids[cur]
+    # read-back reddi son tool eyleminin etkisini geri alır (readback_reset): katlama da bir eylemdir
+    vars["offers_prev"] = vars.get("offers_json") or ""
     state.setdefault("results", [])
     for e in entries:
         state["results"].append(e["product_id"] + ":" + e["kind"])
@@ -323,9 +326,11 @@ def check_offer_answer(vars, RT, answer, amount="", date=""):
     vars["offer_pending"] = ""
     vars["offers_prev"] = vars.get("offers_json") or ""
     state = json.loads(vars.get("offers_json") or "null") or dict(cur=0, items=dict(), results=[])
-    cur = next_open(state, plans, int(state.get("cur", 0)))
+    # kesinleşmiş ürünler yalnız per_product'ta: batch'te statuses_json read-back'e kadar geçicidir (ret → geri alınır)
+    settled = settled_ids(vars) if (RT.get("recording") or dict()).get("mode") == "per_product" else []
+    cur = next_open(state, plans, int(state.get("cur", 0)), settled)
     open_ids = [p["product_id"] for p in plans[cur:]
-                if p["product_id"] not in [r.split(":", 1)[0] for r in state.get("results") or []]]
+                if p["product_id"] not in [r.split(":", 1)[0] for r in state.get("results") or []] + settled]
     if not plans or cur >= len(plans):
         vars["commit"] = "invalid"
         vars["commit_msg"] = "check_offer_answer: no product is open; call propose_results."
@@ -407,7 +412,7 @@ def check_offer_answer(vars, RT, answer, amount="", date=""):
     state["items"][pid] = st
     if done:
         state["results"].append(done)
-        cur = next_open(state, plans, cur + 1)
+        cur = next_open(state, plans, cur + 1, settled)
         state["cur"] = cur
         per_product = (RT.get("recording") or dict()).get("mode") == "per_product"
         if per_product and done.count(":") >= 2:

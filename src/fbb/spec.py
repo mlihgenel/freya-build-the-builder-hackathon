@@ -430,6 +430,56 @@ def resolve_response_fields(spec: PolicySpec, cat: ToolCatalog) -> list[str]:
     return notes
 
 
+# graph'ın tool gövdelerinde kullandığı roller → openapi'de adı değişmişse aranacak kelimeler (kaçınılacaklar)
+REQUEST_ROLES = {
+    "verify_identity": {"customer_id": (("customer", "client"), ()), "field": (("field", "question"), ()),
+                        "answer": (("answer", "value", "response"), ())},
+    "get_account": {"customer_id": (("customer", "client"), ())},
+    "create_promise": {"customer_id": (("customer", "client"), ()), "product_id": (("product", "account"), ()),
+                       "amount": (("amount", "sum", "value"), ()), "date": (("date", "day"), ("time",))},
+    "add_note": {"customer_id": (("customer", "client"), ()), "product_id": (("product", "account"), ()),
+                 "reason": (("reason", "code", "cause"), ())},
+    "schedule_callback": {"customer_id": (("customer", "client"), ()), "date": (("date", "day"), ("time",)),
+                          "time": (("time", "hour", "slot"), ("date",))},
+    "transfer_to_agent": {"customer_id": (("customer", "client"), ()),
+                          "queue": (("queue", "team", "destination", "department"), ())},
+    "close_call": {"customer_id": (("customer", "client"), ()), "outcome": (("outcome", "result", "disposition"), ()),
+                   "reason": (("reason", "code", "cause"), ())},
+}
+
+
+def resolve_request_fields(spec: PolicySpec, cat: ToolCatalog) -> list[str]:
+    """İstek alanı openapi'de rol adıyla yoksa ve spec.tool_fields eşlememişse, rolün kelimelerini içeren TEK aday
+    alanı eşler (ör. schedule_callback.callback_date). Birden çok aday varsa dokunmaz. Değişiklik notlarını döner.
+
+    Claude bir yeniden adlandırmayı kaçırırsa alan gövdeye hiç girmiyordu (build çökmez ama çağrı başarısız olur)."""
+    notes: list[str] = []
+    for tool, roles in REQUEST_ROLES.items():
+        if tool not in cat.tools:
+            continue
+        fields = cat.tools[tool].fields
+        mapped = dict(spec.tool_fields.get(tool, {}))
+        if tool == "verify_identity" and "field" not in fields and "field" not in mapped:
+            continue  # soru başına ayrı gövde alanı (graph kendisi kurar)
+        for role, (words, avoid) in roles.items():
+            cur = mapped.get(role)
+            if (cur and cur in fields) or role in fields:
+                continue
+            if role == "customer_id" and spec.call_variables.customer_id in fields:
+                continue
+            taken = set(mapped.values()) | set(roles) | set(spec.tool_constants.get(tool, {}))
+            cands = [f for f in fields if f not in taken and any(w in f.lower() for w in words)
+                     and not any(a in f.lower() for a in avoid)]
+            if role == "customer_id":
+                cands = [f for f in cands if "id" in f.lower()]
+            if len(cands) == 1:
+                mapped[role] = cands[0]
+                notes.append(f"istek alanı {tool}.{role}: '{cands[0]}' kullanıldı")
+        if mapped != spec.tool_fields.get(tool, {}):
+            spec.tool_fields[tool] = mapped
+    return notes
+
+
 def cross_check(spec: PolicySpec, cat: ToolCatalog) -> list[str]:
     """Spec'teki enum değerlerinin ve alan adlarının openapi ile uyumunu kontrol eder. Hata listesi döner."""
     errs: list[str] = []

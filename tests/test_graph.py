@@ -797,6 +797,12 @@ def test_every_model_tool_call_routes(name, s, case, cat, public_cases):
                     run_snippet(_code_of(n["commit_fix"]), vars=w)
                     route = _route(n["commit_fix"], w)
                 assert route in n, f"{name}: {path + (act[1],)} → {route}"
+                if route == "readback" and name == "per_product":
+                    # read-back onaylandı ve kayıt başarılı: per_product'ta sıradaki ürüne negotiate_more ile dönülür
+                    w["rec_r_ok"] = "true"
+                    run_snippet(_code_of(n["rec_step"]), vars=w)
+                    route = _route(n["rec_step"], w)
+                    assert route in n, f"{name}: {path + (act[1],)} kayıttan sonra → {route}"
                 if route in talk:
                     # platform konuşma node'unun geçişlerini her müşteri turunda yeniden değerlendirir: eski bayrak
                     # tetiklenirse node kendine döner (SC-03: negotiate_more go_more ile 70 tur)
@@ -963,3 +969,156 @@ def test_system_prompt_answers_pending_questions(cat):
     """asks_back PUB-04: kod adımı sırasında sorulan soru (robot mu?) sonraki turda önce cevaplanır."""
     wf = build_workflow(spec("spec_a.json"), cat)
     assert "still unanswered" in wf["system_prompt"] and "answer it in one short sentence first" in wf["system_prompt"]
+
+
+def test_readback_rejection_keeps_folded_statuses(cat, public_cases):
+    """Review (11 Eki): batch'te p3 itirazı katlandı, sonra read-back reddedildi → son teklif cevabı geri alınır ama
+    p3'ün itirazı kalır; p3'e yeniden teklif yapılmaz."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    p1, p2, p3 = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    _both_tools(n, v, "negotiate", ("agreed", str(p1["past_due"]), "2026-10-15"), "p3:dispute")
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "negotiate_fix_say"
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "readback"
+    run_snippet(_code_of(n["readback_reset"]), vars=v)
+    assert _route(n["readback_reset"], v) == "negotiate_fix" and _route(n["negotiate_fix"], v) is None
+    results = json.loads(v["offers_json"])["results"]
+    assert "p3:dispute" in results and not any(r.startswith("p2:") for r in results)  # p2'nin son cevabı geri alındı
+    assert _offer(n, v, "refused", "negotiate_fix") == "readback"                  # p2 tekrar bitti → p3'e teklif yok
+    assert sorted(s["product_id"] + ":" + s["reason"] for s in json.loads(v["statuses_json"])) == \
+        ["p2:refused", "p3:dispute"]
+
+
+def test_fold_then_hardship_keeps_folded_status(cat, public_cases):
+    """p3 itiraz (katlandı), sonra zorluk → kalan açık ürünler hardship, p3 dispute kalır."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    _account(n, v, public_cases["PUB-12"], "spec_ab")
+    assert _propose(n, v, "p3:dispute") == "commit_fix"  # şu anki ürün değişmedi: model kısa cevap verip sürdürür
+    run_snippet(_code_of(n["commit_fix"]), vars=v)
+    route = _offer(n, v, "hardship", "negotiate_fix")
+    assert route in ("record_note", "send_close", "send_close_nr")
+    statuses = json.loads(v.get("statuses_json") or "[]")
+    assert sorted(s["product_id"] + ":" + s["reason"] for s in statuses) == ["p1:hardship", "p2:hardship", "p3:dispute"]
+
+
+def test_agreed_all_skips_disputed_product(cat, public_cases):
+    """p2 itiraz edildi, sonra 'hepsini Cuma öderim' (agreed_all) → p2 promise'e girmez."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    _account(n, v, public_cases["PUB-12"], "spec_ab")
+    _propose(n, v, "p2:dispute")
+    run_snippet(_code_of(n["commit_fix"]), vars=v)
+    assert _offer(n, v, "agreed_all", "negotiate_fix", "", "2026-10-16") == "readback"
+    assert [q["product_id"] for q in json.loads(v["rec_queue"])] == ["p1", "p3"]
+    assert [s["product_id"] for s in json.loads(v["statuses_json"])] == ["p2"]
+
+
+def test_two_tools_after_a_recorded_product_per_product(cat, public_cases):
+    """per_product: p1 kaydedildi; negotiate_more'da aynı turda p2 ret + p3 itiraz → p2 2. deneme sürer, p3 atlanır."""
+    s = spec("spec_ab.json")
+    s.recording.mode = "per_product"
+    n = build_workflow(s, cat)["nodes"]
+    v = {}
+    p1, p2, p3 = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    assert _offer(n, v, "agreed", amount=str(p1["past_due"]), date="2026-10-15") == "readback"
+    v["rec_r_ok"] = "true"
+    run_snippet(_code_of(n["rec_step"]), vars=v)
+    assert _route(n["rec_step"], v) == "negotiate_more"
+    assert _both_tools(n, v, "negotiate_more", ("refused", "", ""), "p3:dispute") == "negotiate_fix_say"
+    assert _route(n["negotiate_fix_say"], v) is None and p3["wording"] not in v["commit_say"]
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "record_note"
+    assert sorted(_drain_notes(n, v)) == [("p2", "refused"), ("p3", "dispute")]
+
+
+def test_propose_with_promise_and_status_uses_normal_validation(cat, public_cases):
+    """Promise + durum içeren propose_results katlanmaz, normal doğrulamaya gider (batch: hepsi listelenmeli)."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    p1, p2, p3 = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    assert _propose(n, v, f"p1:{p1['past_due']}:2026-10-15; p3:dispute") == "commit_fix"
+    assert "missing products" in v["commit_msg"]
+    assert json.loads(v.get("offers_json") or "null") is None
+
+
+def test_readback_rejection_after_final_fold(cat, public_cases):
+    """Son eylem katlama: p1 kabul, p2 iki ret, p3'e teklif sırası gelince itiraz → read-back → ret. Geri alma yalnız
+    son tool çağrısının etkisini (p3 itirazını) kaldırır; p2'nin retleri ve p1 kabulü kalır."""
+    n = build_workflow(spec("spec_ab.json"), cat)["nodes"]
+    v = {}
+    p1, p2, p3 = _account(n, v, public_cases["PUB-12"], "spec_ab")
+    assert _offer(n, v, "agreed", amount=str(p1["past_due"]), date="2026-10-15") == "negotiate_fix_say"
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "negotiate_fix_say"
+    assert _offer(n, v, "refused", "negotiate_fix_say") == "negotiate_fix_say"   # p2 bitti → p3 1. teklif
+    assert p3["wording"] in v["commit_say"]
+    assert _propose(n, v, "p3:dispute", "negotiate_fix_say") == "readback"
+    run_snippet(_code_of(n["readback_reset"]), vars=v)
+    results = json.loads(v["offers_json"])["results"]
+    assert results[:2] == [f"p1:{p1['past_due']}:2026-10-15", "p2:refused"] and "p3:dispute" not in results
+    assert json.loads(v["offers_json"])["cur"] == 2  # p3 yeniden açık
+
+
+def _renamed_request_catalog(tmp_path, extra=None):
+    api = json.loads((KIT / "tools" / "openapi.json").read_text())
+
+    def rename(path, old, new):
+        sch = api["paths"][path]["post"]["requestBody"]["content"]["application/json"]["schema"]
+        sch["properties"][new] = sch["properties"].pop(old)
+        sch["required"] = [new if r == old else r for r in sch.get("required", [])]
+        return sch
+    rename("/schedule_callback", "date", "callback_date")
+    rename("/schedule_callback", "time", "callback_time")
+    rename("/create_promise", "amount", "promise_amount")
+    rename("/create_promise", "date", "promise_date")
+    rename("/close_call", "outcome", "result")
+    rename("/close_call", "reason", "reason_code")
+    rename("/transfer_to_agent", "queue", "team")
+    rename("/add_note", "reason", "note_reason")
+    if extra:
+        extra(api)
+    path = tmp_path / "openapi.json"
+    path.write_text(json.dumps(api))
+    return load_catalog(path)
+
+
+def test_renamed_request_fields_are_mapped(tmp_path):
+    """Gizli openapi'de istek alanları yeniden adlandırılırsa ve Claude tool_fields'i kaçırırsa: tek aday eşlenir,
+    gövdeler doğru alanlarla kurulur, lint temiz."""
+    from fbb.spec import resolve_request_fields
+    vcat = _renamed_request_catalog(tmp_path)
+    s = spec("spec_ab.json")
+    notes = resolve_request_fields(s, vcat)
+    assert s.tool_fields["schedule_callback"] == {"date": "callback_date", "time": "callback_time"}
+    assert s.tool_fields["create_promise"] == {"amount": "promise_amount", "date": "promise_date"}
+    assert s.tool_fields["close_call"] == {"outcome": "result", "reason": "reason_code"}
+    assert s.tool_fields["transfer_to_agent"] == {"queue": "team"}
+    assert s.tool_fields["add_note"] == {"reason": "note_reason"} and len(notes) == 8
+    wf = build_workflow(s, vcat)
+    warnings = []
+    assert _lint(wf, s, vcat, warnings) == [] and not any("zorunlu" in w for w in warnings)
+    n = wf["nodes"]
+    assert set(_body(n["third_party_book"])) == {"customer_id", "callback_date", "callback_time"}
+    assert set(_body(n["record_promise"])) == {"customer_id", "product_id", "promise_amount", "promise_date"}
+    assert set(_body(n["transfer_restructuring"])) == {"customer_id", "team"}
+    assert {"result", "reason_code"} <= set(_body(n["close_unclear"]))
+    assert resolve_request_fields(s, vcat) == []  # ikinci kez: değişiklik yok
+
+
+def test_ambiguous_request_field_is_left_alone(tmp_path):
+    """İki aday varsa (callback_date ve backup_date) tahmin edilmez."""
+    from fbb.spec import resolve_request_fields
+
+    def extra(api):
+        sch = api["paths"]["/schedule_callback"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+        sch["properties"]["backup_date"] = {"type": "string"}
+    vcat = _renamed_request_catalog(tmp_path, extra)
+    s = spec("spec_ab.json")
+    resolve_request_fields(s, vcat)
+    assert "date" not in s.tool_fields.get("schedule_callback", {})
+    assert s.tool_fields["schedule_callback"]["time"] == "callback_time"
+
+
+def test_request_fields_noop_on_kit_openapi(cat):
+    from fbb.spec import resolve_request_fields
+    s = spec("spec_ab.json")
+    assert resolve_request_fields(s, cat) == [] and s.tool_fields == spec("spec_ab.json").tool_fields

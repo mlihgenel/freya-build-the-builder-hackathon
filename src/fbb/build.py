@@ -12,7 +12,7 @@ from pathlib import Path
 from fbb import config
 from fbb.ingest.openapi import load_catalog
 from fbb.ingest.sources import read_sources, slot_for
-from fbb.spec import PolicySpec, cross_check, resolve_response_fields
+from fbb.spec import PolicySpec, cross_check, resolve_request_fields, resolve_response_fields
 from fbb.trace import Trace
 from fbb.workflow.graph import build_workflow, workflow_hash
 from fbb.workflow.lint import lint
@@ -51,6 +51,9 @@ def run_build(opts: BuildOptions) -> dict:
         fixes = resolve_response_fields(spec, cat)
         if fixes:
             trace.event("response_fields", f"{len(fixes)} cevap alanı openapi'ye göre eşlendi", fixes=fixes)
+        req = resolve_request_fields(spec, cat)
+        if req:
+            trace.event("request_fields", f"{len(req)} istek alanı openapi'ye göre eşlendi", fixes=req)
         config.OUT.mkdir(parents=True, exist_ok=True)
         spec_path = config.OUT / f"{slot}.spec.json"
         spec_path.write_text(spec.model_dump_json(indent=1))
