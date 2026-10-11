@@ -1,0 +1,502 @@
+{
+ "language": "English",
+ "bank_name": "Harbour Mutual",
+ "agent_role": "You are Harbour Mutual's virtual assistant on a phone call; we record this call.",
+ "call_variables": {
+  "customer_id": "customer_id",
+  "now": "now",
+  "address": "{title} {last_name}",
+  "all": [
+   "customer_id",
+   "first_name",
+   "last_name",
+   "title",
+   "now"
+  ]
+ },
+ "opening": {
+  "first_sentence": "Hi, you're speaking with Harbour Mutual's virtual assistant, and we record this call.",
+  "confirm_question": "Could I check I'm speaking with {title} {last_name}?",
+  "accepted_confirmations": [
+   "yes",
+   "speaking",
+   "it's me",
+   "the member saying their own name"
+  ],
+  "not_confirmations": [
+   "who is this?",
+   "what is it about?",
+   "maybe",
+   "hello?",
+   "he's not here",
+   "she's not here",
+   "a different name"
+  ],
+  "forbidden_before_verification": [
+   "money",
+   "amount",
+   "payment",
+   "overdue",
+   "arrears",
+   "debt",
+   "balance",
+   "loan",
+   "personal loan",
+   "car loan",
+   "credit card",
+   "card",
+   "product",
+   "late",
+   "owe",
+   "arrangement"
+  ],
+  "max_asks": 2,
+  "unclear": {
+   "outcome": "no_contact",
+   "reason": "unclear"
+  },
+  "robot_answer": "Yes, I'm Harbour Mutual's virtual assistant.",
+  "scam_answer": "I understand your caution. This is Harbour Mutual. I will never ask for your PIN or passwords; I only ask a few security questions to make sure I'm speaking with the right person.",
+  "unknown_answer": "I'm sorry, I can't answer that on this call."
+ },
+ "third_party": {
+  "say_nothing_beyond_opening": true,
+  "ask_reachability": "When would be a good time to reach {title} {last_name}?",
+  "callback": {
+   "days": [
+    "next_business_day"
+   ],
+   "start": "08:30",
+   "end": "18:00",
+   "hours_by_weekday": {
+    "0": {
+     "start": "08:30",
+     "end": "18:00"
+    },
+    "1": {
+     "start": "08:30",
+     "end": "18:00"
+    },
+    "2": {
+     "start": "08:30",
+     "end": "18:00"
+    },
+    "3": {
+     "start": "08:30",
+     "end": "18:00"
+    },
+    "4": {
+     "start": "08:30",
+     "end": "13:00"
+    }
+   },
+   "inclusive": true,
+   "after_now": true,
+   "retries": 1
+  },
+  "callback_outcome": {
+   "outcome": "no_contact",
+   "reason": "callback"
+  },
+  "no_callback_outcome": {
+   "outcome": "no_contact",
+   "reason": "no_callback"
+  },
+  "wrong_number_outcome": {
+   "outcome": "no_contact",
+   "reason": "wrong_number"
+  },
+  "deceased_outcome": {
+   "outcome": "no_contact",
+   "reason": "deceased"
+  },
+  "deceased_sentence": "I'm very sorry to hear that.",
+  "rules": [
+   "Do not explain the reason for the call to anyone but the member.",
+   "Ask when the member is free; book a callback only on the next business day (not today), Monday to Thursday 08:30-18:00, Friday 08:30-13:00, never weekends or holidays.",
+   "If the time offered does not fit, ask one more time; if it still does not fit, do not book.",
+   "For a death of the member say only \"I'm very sorry to hear that.\" and nothing more.",
+   "Wrong number ends as no_contact / wrong_number."
+  ]
+ },
+ "identity": {
+  "questions": [
+   {
+    "field": "date_of_birth",
+    "ask": "For security, could you tell me your date of birth, please?",
+    "answer_type": "date",
+    "example": "1980-05-14"
+   },
+   {
+    "field": "house_number",
+    "ask": "Thank you. And what is the first line of your home address? Just the house number is enough.",
+    "answer_type": "alnum",
+    "example": "12A"
+   },
+   {
+    "field": "phone_last4",
+    "ask": "Thank you. And what are the last four digits of the phone number we have on file?",
+    "answer_type": "digits:4",
+    "example": "1234"
+   }
+  ],
+  "verify_mode": "each",
+  "one_at_a_time": true,
+  "numeric_date_order": "DMY",
+  "max_wrong_total": 3,
+  "retry_wrong_sentence": "That doesn't match our records. Let's try again.",
+  "swap_hint": "day_month_swapped",
+  "swap_instruction": "Could you say your date of birth again, with the day and the month the other way round?",
+  "fail_sentence": "I'm sorry, I couldn't verify your identity, so I can't continue with this call.",
+  "fail_outcome": {
+   "outcome": "security_failed",
+   "reason": "wrong_answers"
+  },
+  "decline_explain": "These questions keep your account safe, so I need them before I can continue.",
+  "decline_outcome": {
+   "outcome": "security_failed",
+   "reason": "declined"
+  },
+  "decline_close_after": 2,
+  "purpose_question_counts_as_decline": true
+ },
+ "disclosure": {
+  "debt_intro": "Thank you. We're calling about an overdue payment.",
+  "debt_sentence": "Your {product} has an overdue amount of {past_due} and is {days_late} days overdue.",
+  "product_wording": {
+   "credit_card": "credit card ending {card_last4}",
+   "personal_loan": "personal loan",
+   "car_loan": "car loan"
+  },
+  "floor_field": {
+   "credit_card": "minimum_payment",
+   "personal_loan": "instalment_amount",
+   "car_loan": "instalment_amount"
+  },
+  "floor_rule": {}
+ },
+ "calendar": {
+  "weekdays": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "holidays": [
+   "2026-11-02",
+   "2026-11-11",
+   "2026-12-08",
+   "2026-12-25",
+   "2026-12-28"
+  ]
+ },
+ "bands": [
+  {
+   "name": "A",
+   "min": 1,
+   "max": 9,
+   "deadline_bd": 11,
+   "deadline_rule": "",
+   "attempts": 1
+  },
+  {
+   "name": "B",
+   "min": 10,
+   "max": 34,
+   "deadline_bd": 6,
+   "deadline_rule": "",
+   "attempts": 2
+  },
+  {
+   "name": "C",
+   "min": 35,
+   "max": 50,
+   "deadline_bd": 4,
+   "deadline_rule": "",
+   "attempts": 2
+  }
+ ],
+ "negotiation": {
+  "first_ask_single": "Could you settle the full amount today?",
+  "first_ask_multi": "Could you settle the full amounts today?",
+  "attempts": [
+   {
+    "n": 1,
+    "amount": "full",
+    "date": "end_of_week",
+    "bands": []
+   },
+   {
+    "n": 2,
+    "amount": "floor",
+    "date": "deadline",
+    "bands": [
+     "B",
+     "C"
+    ]
+   }
+  ],
+  "rules": [
+   "Ask for the full overdue amount first.",
+   "If the member says the full amount is too much, offer the lowest amount (minimum_payment for credit cards, instalment_amount for loans) once and mention that the remainder stays overdue.",
+   "Never accept less than the lowest amount.",
+   "Never accept more than the overdue amount.",
+   "Only accept a date that is a business day, not in the past and not after the latest arrangement date.",
+   "Stage A: 1 persuasion attempt; stages B and C: 2 persuasion attempts.",
+   "Attempt 1: full amount on the last business day of this week (of next week if today is already that day). Attempt 2 (stages B and C): lowest amount on the latest arrangement date.",
+   "If the member still says no after the allowed attempts, end that product as no arrangement, refused.",
+   "In hardship (illness, bereavement, job loss): say one line of sympathy, make no persuasion, offer the support team.",
+   "Never offer discounts, payment holidays, fee waivers or new plans."
+  ],
+  "forbidden_offers": [
+   "discounts",
+   "payment holidays",
+   "fee waivers",
+   "new plans"
+  ],
+  "hardship_status": "hardship",
+  "floor_note": "The remainder will stay overdue."
+ },
+ "confirmation": {
+  "confirm_question": "Is that right?",
+  "rules": [
+   "Read the product, amount and date back before recording.",
+   "Record only after a clear yes.",
+   "If the member changes something, read it back again and ask again."
+  ],
+  "change_after_record_sentence": ""
+ },
+ "recording": {
+  "mode": "batch",
+  "retries": 1,
+  "success_sentence": "You'll get an SMS confirming this arrangement.",
+  "failure_sentence": "I'm sorry, I couldn't record the arrangement because of a system error.",
+  "failure_status": "system_error"
+ },
+ "transfers": [
+  {
+   "id": "new_plan",
+   "queue": "restructuring",
+   "trigger": "The member asks for a new plan or lower instalments.",
+   "say": "I'll transfer you to a colleague who can discuss that.",
+   "ask_first": "",
+   "stages": [
+    "post_verify"
+   ]
+  },
+  {
+   "id": "person",
+   "queue": "general",
+   "trigger": "The member asks to speak to a person.",
+   "say": "I'll transfer you to a colleague.",
+   "ask_first": "Is there anything I can help you with?",
+   "stages": [
+    "pre_identity",
+    "post_verify"
+   ]
+  },
+  {
+   "id": "support",
+   "queue": "support",
+   "trigger": "The member mentions hardship (illness, bereavement, job loss) and accepts the offer of the support team.",
+   "say": "I'll transfer you to our support team.",
+   "ask_first": "",
+   "stages": [
+    "post_verify"
+   ]
+  }
+ ],
+ "statuses": [
+  {
+   "id": "refused",
+   "trigger": "The member declines to make an arrangement after the allowed persuasion attempts.",
+   "say": "",
+   "persuade": true
+  },
+  {
+   "id": "hardship",
+   "trigger": "The member mentions hardship (illness, bereavement, job loss) and declines the transfer to the support team.",
+   "say": "I'm sorry to hear you're going through this.",
+   "persuade": false
+  },
+  {
+   "id": "disputed",
+   "trigger": "The member says it is not their debt.",
+   "say": "I understand, I've noted that.",
+   "persuade": false
+  },
+  {
+   "id": "paid",
+   "trigger": "The member says they have already paid.",
+   "say": "Thank you. Payments can take up to three business days to show.",
+   "persuade": false
+  }
+ ],
+ "multi_product": {
+  "enabled": true,
+  "rules": [
+   "State every overdue product returned by get_account.",
+   "Negotiate each product separately with its own stage, deadline and lowest amount.",
+   "Record at most one arrangement per product."
+  ],
+  "notes_enabled": false,
+  "no_notes_on_transfer": true
+ },
+ "closing": {
+  "promise_outcome": "arranged",
+  "paid_outcome": "paid",
+  "no_promise_outcome": "no_arrangement",
+  "transfer_outcome": "transferred",
+  "paid_status": "paid",
+  "transfer_reasons": {
+   "restructuring": "new_plan",
+   "general": "person",
+   "support": "support"
+  },
+  "status_to_reason": {},
+  "no_reason_outcomes": [
+   "arranged",
+   "paid"
+  ],
+  "hangup_verified": {
+   "outcome": "no_arrangement",
+   "reason": "refused"
+  },
+  "hangup_unverified": {
+   "outcome": "no_contact",
+   "reason": "unclear"
+  },
+  "goodbye_sentence": "Thank you for your time. Goodbye."
+ },
+ "money": {
+  "prefix": "",
+  "suffix": "",
+  "always_decimals": false
+ },
+ "tool_fields": {},
+ "tool_constants": {},
+ "response_fields": {
+  "ok": "ok",
+  "verified": "verified",
+  "all_verified": "all_verified",
+  "wrong_answers_left": "wrong_answers_left",
+  "hint": "hint",
+  "products": "products",
+  "product_id": "product_id",
+  "product_type": "type",
+  "past_due": "past_due",
+  "days_late": "days_late"
+ },
+ "customer_callback": {
+  "enabled": false,
+  "trigger": "",
+  "ask": "",
+  "outcome": {
+   "outcome": "",
+   "reason": ""
+  },
+  "no_callback_outcome": null,
+  "stages": [
+   "post_verify"
+  ],
+  "window": null
+ },
+ "overrides": [
+  {
+   "effective_from": "",
+   "effective_until": "2026-11-30",
+   "note": "Risk & Compliance memo d): until 2026-11-30 inclusive, stage A latest arrangement date is the 9th business day; from 2026-12-01 the policy value (11th) applies.",
+   "bands": [
+    {
+     "name": "A",
+     "min": 1,
+     "max": 9,
+     "deadline_bd": 9,
+     "deadline_rule": "",
+     "attempts": 1
+    },
+    {
+     "name": "B",
+     "min": 10,
+     "max": 34,
+     "deadline_bd": 6,
+     "deadline_rule": "",
+     "attempts": 2
+    },
+    {
+     "name": "C",
+     "min": 35,
+     "max": 50,
+     "deadline_bd": 4,
+     "deadline_rule": "",
+     "attempts": 2
+    }
+   ],
+   "holidays_add": [],
+   "holidays_remove": [],
+   "weekdays": null,
+   "callback": null,
+   "floor_rule": null,
+   "attempts": null
+  }
+ ],
+ "locale": {
+  "weekday_names": [
+   "Monday",
+   "Tuesday",
+   "Wednesday",
+   "Thursday",
+   "Friday",
+   "Saturday",
+   "Sunday"
+  ],
+  "month_names": [
+   "January",
+   "February",
+   "March",
+   "April",
+   "May",
+   "June",
+   "July",
+   "August",
+   "September",
+   "October",
+   "November",
+   "December"
+  ],
+  "one_moment": "One moment, please.",
+  "could_not_check": "Sorry, I could not check that answer.",
+  "ask_year": "Thank you. And the year, please?",
+  "ask_day_month": "Thank you. And the day and the month, please?",
+  "ask_rest": "Thank you. And the rest, please?",
+  "readback_intro": "Let me read that back.",
+  "readback_item": "{amount} on {date} for your {product}",
+  "promise_recorded": "Your promise to pay {amount} on {date} for your {product} is recorded.",
+  "moved_deadline": "The latest date I can record for your {product} is {date}.",
+  "moved_business_day": "{asked} is not a business day, so for your {product} the date is {date}.",
+  "capped_amount": "The past-due amount of your {product} is {amount}.",
+  "below_floor": "I cannot accept less than {amount} for your {product}. Could you pay {amount}?",
+  "past_date": "That date has already passed. Could you pay by {date}?",
+  "continue_with": "Let us continue with your {product}.",
+  "offer": "Could you pay {amount} for your {product} on {date}?"
+ },
+ "general_rules": [
+  "Use the call variable now for all date maths, never the actual clock.",
+  "Send customer_id to every tool call.",
+  "Say nothing about money, products or arrears before the member has passed the security checks, whoever answers.",
+  "Ask security questions one at a time, in order: date of birth, house number, last four digits of the phone number.",
+  "Two wrong security answers in total are tolerated; a third fails the check.",
+  "Never offer discounts, payment holidays, fee waivers or new plans.",
+  "For 'already paid' take nothing and end as paid.",
+  "For 'not my debt' do not argue; end as no arrangement, disputed."
+ ],
+ "unmapped": [
+  "Memo a): stage B is 10-34 days overdue, stage C 35-50 (already applied).",
+  "Memo b): 2026-11-11 is a holiday (call-centre staff day) (already applied).",
+  "Memo c): the dialler code no_arrangement/declined is now no_arrangement/refused; use refused everywhere (already applied).",
+  "Memo d): until 2026-11-30 inclusive stage A gets the 9th business day as latest arrangement date; from 2026-12-01 the 11th again (already applied in overrides).",
+  "Policy 3.1: the Monday after Easter does not apply as a holiday this year.",
+  "The brief's opening line says 'this call is being recorded'; it is phrased as 'we record this call' so it cannot be confused with a recorded arrangement."
+ ]
+}

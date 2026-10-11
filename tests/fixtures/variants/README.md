@@ -5,6 +5,9 @@ Gizli brief'lere benzeyen ama **uydurma** girdiler. Amaç builder'ın kırılmad
 | Dosya | Ne değişiyor |
 |---|---|
 | `brief_c.md` | ham materyal tek dosyada (mail, poliçe, memo, kod listesi). Tarihli memo değişikliği, 3 bant, yüzde floor, farklı callback penceresi, farklı outcome/reason kodları |
+| `brief_d.md` + `openapi_d.json` | temiz spec formatı: 3 bant, `per_product`, müşteri callback'i (+ `no_callback_outcome`), posta kodu + doğum yılı, farklı outcome kodları. `spec_d_expected.json` |
+| `brief_e.md` + `openapi_e.json` | ham materyal (mail + poliçe + memo + dialler export): hafta gününe göre callback saatleri, 3 kimlik sorusu (ev numarası), memo'da bant sınırı + tarihe kadar geçerli deadline + kod yeniden adlandırma. `spec_e_expected.json` |
+| `spec_pp.json`, `spec_cc.json` | `fbb scenarios` için altın spec varyantları (per_product, customer_callback) |
 | `openapi_c.json` | kimlik alanları `postcode`/`birth_year`, yanıt alanları yeniden adlandırılmış (`amount_due`, `minimum_due`, `identity_confirmed`, `attempts_left`), `create_promise`'e fazladan zorunlu `channel`, farklı enum'lar |
 
 ```bash
@@ -40,3 +43,9 @@ Build **başarılı**: 43 node, lint 0, uyarı 0, spec 0 uyumsuzluk.
 | 5 | Overdraft floor = max(%25, `minimum_due`) | ❌ ifade edilemiyordu → `floor_rule`'a `max:`/`min:` eklendi (23:16). Yeniden koşu: `overdraft: max:percent:25,field:minimum_due` ✅ |
 | 6 | "Sonraki iki iş günü" callback | ✅ `business_days:2`, aynı gün yok |
 | 7 | Harf harf posta kodu | ✅ `answer_type: postcode` |
+
+## Sonuç: 11 Eki (Opus)
+
+- C: 2 çıkarım, `spec_c_expected.json`'a karşı 0 PUAN farkı (7 maddenin hepsi doğru + memo tatili).
+- D: 3 çıkarım; tek fark (insan isteğinin aşaması) `extract.md` kuralıyla kapandı, 3. çıkarım 0 fark.
+- E: 2 çıkarım, birbirine karşı 0 PUAN farkı; bütün tuzaklar doğru (memo bant sınırları, tarihe kadar geçerli override, hafta günü saatleri, kod yeniden adlandırma, 3 kimlik sorusu).
