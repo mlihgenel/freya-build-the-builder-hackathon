@@ -4,7 +4,7 @@
     { "name": "Melih Genel", "email": "mlihgenel@gmail.com" },
     { "name": "Mert Kırgıl", "email": "kirgilmert@gmail.com" }
   ],
-  "repo": "https://github.com/mlihgenel/yz50-hackathon",
+  "repo": "https://github.com/mlihgenel/freya-build-the-builder-hackathon",
   "commit": "TESLIM_BUILDININ_COMMITI",
   "run_command": "python3 builder/build.py final https://yz50-bank-mock.kirgilmert.workers.dev 2>&1 | tee traces/final.log",
   "workflow": "exports/final.workflow.json",
