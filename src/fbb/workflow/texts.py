@@ -33,6 +33,10 @@ def system_prompt(spec: PolicySpec) -> str:
         lines.append(f'- If asked whether you are a robot, a machine or an AI, say: "{o.robot_answer}" Then continue.')
     if o.scam_answer:
         lines.append(f'- If asked whether this call is a scam or genuine, say: "{o.scam_answer}" Then continue.')
+    # asks_back PUB-04 (11 Eki): "Are you a robot?" bir kod adımı sırasında geldi, ardından borç cümlesi söylendi ve
+    # soru hiç cevaplanmadı
+    lines.append("- If the customer asked a question that is still unanswered (also one asked while the system was "
+                 "speaking or working, just before an announcement), answer it in one short sentence first.")
     lines.append(f'- If asked something you cannot answer from the facts you were given, say: '
                  f'"{o.unknown_answer or "I do not have that information."}" Never invent figures, dates or reasons.')
     lines += [

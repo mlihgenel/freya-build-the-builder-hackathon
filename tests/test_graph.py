@@ -957,3 +957,9 @@ def test_customer_callback_no_callback_outcome(cat):
         if route == "cust_cb_fix":
             run_snippet(_code_of(n["cust_cb_fix"]), vars=v)
     assert route == "close_cust_no_callback"
+
+
+def test_system_prompt_answers_pending_questions(cat):
+    """asks_back PUB-04: kod adımı sırasında sorulan soru (robot mu?) sonraki turda önce cevaplanır."""
+    wf = build_workflow(spec("spec_a.json"), cat)
+    assert "still unanswered" in wf["system_prompt"] and "answer it in one short sentence first" in wf["system_prompt"]
