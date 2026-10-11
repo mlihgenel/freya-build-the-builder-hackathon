@@ -1,0 +1,433 @@
+{
+ "language": "English",
+ "bank_name": "Saffron Finance",
+ "agent_role": "You are Saffron Finance's digital assistant on a phone call; we record this call for quality purposes.",
+ "call_variables": {
+  "customer_id": "customer_id",
+  "now": "now",
+  "address": "{title} {last_name}",
+  "all": [
+   "customer_id",
+   "first_name",
+   "last_name",
+   "title",
+   "now"
+  ]
+ },
+ "opening": {
+  "first_sentence": "Hello, this is Saffron Finance's digital assistant. We record this call for quality purposes.",
+  "confirm_question": "Am I speaking with {title} {first_name} {last_name}?",
+  "accepted_confirmations": [
+   "yes",
+   "the customer's own name"
+  ],
+  "not_confirmations": [
+   "silence",
+   "an unclear answer",
+   "a question back",
+   "another person's name"
+  ],
+  "forbidden_before_verification": [
+   "debt",
+   "payment",
+   "pay",
+   "overdue",
+   "late",
+   "owe",
+   "amount",
+   "arrears",
+   "mortgage",
+   "student loan",
+   "pay-later",
+   "loan",
+   "account",
+   "promise"
+  ],
+  "max_asks": 2,
+  "unclear": {
+   "outcome": "NO_CONTACT_UNCLEAR",
+   "reason": ""
+  },
+  "robot_answer": "Yes, I am Saffron Finance's digital assistant.",
+  "scam_answer": "This is a genuine call from Saffron Finance. I can only discuss details after a short security check.",
+  "unknown_answer": "I am sorry, I do not have that information."
+ },
+ "third_party": {
+  "say_nothing_beyond_opening": true,
+  "ask_reachability": "When would be a good time to reach {title} {last_name}?",
+  "callback": {
+   "days": [
+    "business_days:2"
+   ],
+   "start": "10:00",
+   "end": "18:00",
+   "hours_by_weekday": {},
+   "inclusive": true,
+   "after_now": true,
+   "min_lead_minutes": 0,
+   "retries": 1
+  },
+  "callback_outcome": {
+   "outcome": "NO_CONTACT_CALLBACK",
+   "reason": ""
+  },
+  "no_callback_outcome": {
+   "outcome": "NO_CONTACT_NO_CALLBACK",
+   "reason": ""
+  },
+  "wrong_number_outcome": {
+   "outcome": "NO_CONTACT_WRONG_NUMBER",
+   "reason": ""
+  },
+  "deceased_outcome": {
+   "outcome": "NO_CONTACT_DECEASED",
+   "reason": ""
+  },
+  "deceased_sentence": "We are deeply sorry for your loss.",
+  "rules": [
+   "Say nothing about the reason for the call to anyone but the customer.",
+   "A callback can only be booked on the next two working days, not today, between 10:00 and 18:00.",
+   "Call schedule_callback before closing with NO_CONTACT_CALLBACK.",
+   "If no time inside the window is offered after one retry, close with NO_CONTACT_NO_CALLBACK."
+  ]
+ },
+ "identity": {
+  "questions": [
+   {
+    "field": "date_of_birth",
+    "ask": "For security, could you tell me your date of birth, please?",
+    "answer_type": "date",
+    "example": "1985-04-23"
+   },
+   {
+    "field": "postcode",
+    "ask": "Thank you. And what is the postcode of your home address?",
+    "answer_type": "postcode",
+    "example": "SW1A1AA"
+   }
+  ],
+  "verify_mode": "all_at_once",
+  "one_at_a_time": true,
+  "numeric_date_order": "DMY",
+  "max_wrong_total": 3,
+  "retry_wrong_sentence": "Sorry, those details did not match. Let me ask both questions again.",
+  "swap_hint": "day_month_swapped",
+  "swap_instruction": "The day and month may have been swapped. Could you tell me your date of birth again, with the day first and then the month?",
+  "fail_sentence": "I am sorry, I could not verify your identity, so I cannot discuss the account.",
+  "fail_outcome": {
+   "outcome": "SECURITY_FAILED",
+   "reason": ""
+  },
+  "decline_explain": "I understand. These questions protect your information; I can only continue after this short security check.",
+  "decline_outcome": {
+   "outcome": "SECURITY_DECLINED",
+   "reason": ""
+  },
+  "decline_close_after": 2,
+  "purpose_question_counts_as_decline": true
+ },
+ "disclosure": {
+  "debt_intro": "Thank you, you are verified. I am calling about an overdue payment.",
+  "debt_sentence": "Your {product} has an overdue amount of {past_due} and is {days_late} days late.",
+  "product_wording": {
+   "mortgage": "mortgage",
+   "student_loan": "student loan",
+   "pay_later": "pay-later plan"
+  },
+  "floor_field": {},
+  "floor_rule": {
+   "*": "percent:30"
+  }
+ },
+ "calendar": {
+  "weekdays": [
+   6,
+   0,
+   1,
+   2,
+   3
+  ],
+  "holidays": [
+   "2026-11-30",
+   "2026-12-02",
+   "2026-12-03"
+  ]
+ },
+ "bands": [
+  {
+   "name": "1-10",
+   "min": 1,
+   "max": 10,
+   "deadline_bd": 4,
+   "deadline_rule": "date:2026-10-29",
+   "attempts": 1
+  },
+  {
+   "name": "11-40",
+   "min": 11,
+   "max": 40,
+   "deadline_bd": 4,
+   "deadline_rule": "business_days:4",
+   "attempts": 2
+  }
+ ],
+ "negotiation": {
+  "first_ask_single": "Can you pay the full amount today?",
+  "first_ask_multi": "",
+  "attempts": [
+   {
+    "n": 1,
+    "amount": "full",
+    "date": "end_of_week",
+    "bands": []
+   },
+   {
+    "n": 2,
+    "amount": "floor",
+    "date": "deadline",
+    "bands": [
+     "11-40"
+    ]
+   }
+  ],
+  "rules": [
+   "Ask for the full overdue amount first.",
+   "A promise date must be a working day (Sunday to Thursday, not a public holiday), today or later, and not after the latest promise date.",
+   "Latest promise date: 1-10 days late is 2026-10-29; 11-40 days late is the 4th working day after today.",
+   "The lowest acceptable amount is 30% of the overdue amount; offer it only once, and say the rest stays overdue.",
+   "Never accept an amount below 30% of the overdue amount or above the overdue amount.",
+   "1-10 days late gets one attempt; 11-40 days late gets two attempts.",
+   "On hardship: say one sentence of sympathy, do not persuade, offer the care team.",
+   "Never offer discounts, waivers or new plans.",
+   "A flat refusal after the attempts ends with NO_PROMISE_REFUSED."
+  ],
+  "forbidden_offers": [
+   "discounts",
+   "waivers",
+   "new plans"
+  ],
+  "hardship_status": "hardship",
+  "floor_note": "The rest of the overdue amount stays overdue."
+ },
+ "confirmation": {
+  "confirm_question": "Do you agree?",
+  "rules": [
+   "Read back product, amount and date before recording.",
+   "Record only after a clear yes."
+  ],
+  "change_after_record_sentence": ""
+ },
+ "recording": {
+  "mode": "batch",
+  "retries": 1,
+  "success_sentence": "Thank you, your promise is noted and you will get a confirmation message.",
+  "failure_sentence": "I am sorry, I could not save your promise because of a system problem.",
+  "failure_status": "service_error"
+ },
+ "transfers": [
+  {
+   "id": "hardship_care",
+   "queue": "care",
+   "trigger": "Customer mentions hardship (illness, a death, job loss, etc.) and accepts the offer of the care team",
+   "say": "I will transfer you to our care team now.",
+   "ask_first": "",
+   "stages": [
+    "post_verify"
+   ]
+  },
+  {
+   "id": "restructure",
+   "queue": "restructure",
+   "trigger": "Customer asks about restructuring or lower instalments",
+   "say": "I will transfer you to a colleague who can discuss that.",
+   "ask_first": "",
+   "stages": [
+    "post_verify"
+   ]
+  },
+  {
+   "id": "human",
+   "queue": "agent",
+   "trigger": "Customer asks to speak to a person",
+   "say": "I will transfer you to a colleague now.",
+   "ask_first": "Is there anything I can help you with myself?",
+   "stages": [
+    "pre_identity",
+    "post_verify"
+   ]
+  }
+ ],
+ "statuses": [
+  {
+   "id": "refused",
+   "trigger": "Customer flatly refuses to pay or to make a promise",
+   "say": "I understand.",
+   "persuade": true
+  },
+  {
+   "id": "hardship",
+   "trigger": "Customer mentions hardship (illness, a death, job loss) and declines the care team",
+   "say": "I am very sorry to hear that.",
+   "persuade": false
+  },
+  {
+   "id": "dispute",
+   "trigger": "Customer says it is not their debt",
+   "say": "I understand, I have noted that you dispute this.",
+   "persuade": false
+  },
+  {
+   "id": "paid",
+   "trigger": "Customer says they have already paid",
+   "say": "Thank you. Payments take one working day to appear.",
+   "persuade": false
+  }
+ ],
+ "multi_product": {
+  "enabled": false,
+  "rules": [],
+  "notes_enabled": false,
+  "no_notes_on_transfer": true
+ },
+ "closing": {
+  "promise_outcome": "PROMISE",
+  "paid_outcome": "PAID",
+  "no_promise_outcome": "NO_PROMISE_REFUSED",
+  "transfer_outcome": "TRANSFERRED_AGENT",
+  "paid_status": "paid",
+  "transfer_reasons": {
+   "care": "TRANSFERRED_CARE",
+   "restructure": "TRANSFERRED_RESTRUCTURE",
+   "agent": "TRANSFERRED_AGENT"
+  },
+  "status_to_reason": {
+   "refused": "NO_PROMISE_REFUSED",
+   "hardship": "NO_PROMISE_HARDSHIP",
+   "dispute": "NO_PROMISE_DISPUTE",
+   "paid": "PAID",
+   "service_error": "NO_PROMISE_SYSTEM_ERROR"
+  },
+  "no_reason_outcomes": [
+   "PROMISE",
+   "PAID",
+   "TRANSFERRED_CARE",
+   "TRANSFERRED_RESTRUCTURE",
+   "TRANSFERRED_AGENT",
+   "NO_PROMISE_REFUSED",
+   "NO_PROMISE_HARDSHIP",
+   "NO_PROMISE_DISPUTE",
+   "NO_PROMISE_SYSTEM_ERROR",
+   "SECURITY_FAILED",
+   "SECURITY_DECLINED",
+   "NO_CONTACT_CALLBACK",
+   "NO_CONTACT_NO_CALLBACK",
+   "NO_CONTACT_WRONG_NUMBER",
+   "NO_CONTACT_DECEASED",
+   "NO_CONTACT_UNCLEAR"
+  ],
+  "promise_reason": "",
+  "promise_reason_partial": "",
+  "paid_reason": "",
+  "hangup_verified": {
+   "outcome": "NO_PROMISE_REFUSED",
+   "reason": ""
+  },
+  "hangup_unverified": {
+   "outcome": "NO_CONTACT_UNCLEAR",
+   "reason": ""
+  },
+  "goodbye_sentence": "Thank you for your time. Goodbye."
+ },
+ "money": {
+  "prefix": "AED ",
+  "suffix": "",
+  "always_decimals": false
+ },
+ "tool_fields": {
+  "schedule_callback": {
+   "time": "callback_at"
+  },
+  "close_call": {
+   "outcome": "result_code"
+  }
+ },
+ "tool_constants": {},
+ "response_fields": {
+  "ok": "ok",
+  "verified": "verified",
+  "all_verified": "all_verified",
+  "wrong_answers_left": "wrong_answers_left",
+  "hint": "hint",
+  "products": "products",
+  "product_id": "product_id",
+  "product_type": "type",
+  "past_due": "past_due",
+  "days_late": "days_late"
+ },
+ "customer_callback": {
+  "enabled": false,
+  "trigger": "",
+  "ask": "",
+  "outcome": {
+   "outcome": "",
+   "reason": ""
+  },
+  "no_callback_outcome": null,
+  "stages": [
+   "post_verify"
+  ],
+  "window": null
+ },
+ "overrides": [],
+ "locale": {
+  "weekday_names": [
+   "Monday",
+   "Tuesday",
+   "Wednesday",
+   "Thursday",
+   "Friday",
+   "Saturday",
+   "Sunday"
+  ],
+  "month_names": [
+   "January",
+   "February",
+   "March",
+   "April",
+   "May",
+   "June",
+   "July",
+   "August",
+   "September",
+   "October",
+   "November",
+   "December"
+  ],
+  "one_moment": "One moment, please.",
+  "could_not_check": "Sorry, I could not check that answer.",
+  "ask_year": "Thank you. And the year, please?",
+  "ask_day_month": "Thank you. And the day and the month, please?",
+  "ask_rest": "Thank you. And the rest, please?",
+  "readback_intro": "Let me read that back.",
+  "readback_item": "{amount} on {date} for your {product}",
+  "promise_recorded": "Your promise to pay {amount} on {date} for your {product} is recorded.",
+  "moved_deadline": "The latest date I can record for your {product} is {date}.",
+  "moved_business_day": "{asked} is not a business day, so for your {product} the date is {date}.",
+  "capped_amount": "The past-due amount of your {product} is {amount}.",
+  "below_floor": "I cannot accept less than {amount} for your {product}. Could you pay {amount}?",
+  "past_date": "That date has already passed. Could you pay by {date}?",
+  "continue_with": "Let us continue with your {product}.",
+  "offer": "Could you pay {amount} for your {product} on {date}?"
+ },
+ "general_rules": [
+  "Say amounts as AED followed by the number, e.g. AED 1,250.",
+  "Use the call variable now for all date rules.",
+  "Say nothing about the debt, the product or payments before security is passed, to anyone.",
+  "Send customer_id to every tool.",
+  "Say goodbye before close_call; every call ends with exactly one close_call carrying exactly one result_code.",
+  "Never offer discounts, waivers or new plans."
+ ],
+ "unmapped": [
+  "Only after both security answers are collected, call verify_identity once with both answers; if it fails and attempts are left, ask both questions again."
+ ]
+}
